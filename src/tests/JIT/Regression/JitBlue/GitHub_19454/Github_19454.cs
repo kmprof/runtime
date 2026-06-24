@@ -4,7 +4,11 @@
 // GitHub19454: a zero length span was tripping up the jit when trying
 // to analyze a bounds check.
 
+
+namespace Github_19454;
+
 using System;
+using Xunit;
 
 public struct MyStruct
 {
@@ -26,13 +30,13 @@ public struct MyReader
     }
 }
 
-class GitHub_19454
+public class GitHub_19454
 {
-    static int Main()
+    [Fact]
+    public static void TestEntryPoint()
     {
         MyReader r = new MyReader();
         r.ReadBytesInner(0);
-        return 100;
     }
 }
 

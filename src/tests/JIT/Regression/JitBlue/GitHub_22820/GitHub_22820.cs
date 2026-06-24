@@ -1,13 +1,17 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_22820;
+
 using System;
+using Xunit;
 
 // Repro for https://github.com/dotnet/coreclr/issues/22820.
 // On x86 we need to report enclosed handler
 // live-in locals as live into any enclosing filter.
 //
-// Run with optimized codegen and COMPlus_GCStress=0x4
+// Run with optimized codegen and DOTNET_GCStress=0x4
 
 class DisposableObject : IDisposable
 {
@@ -17,7 +21,7 @@ class DisposableObject : IDisposable
     }
 }
 
-class Program
+public class Program
 {
     public static bool IsExpectedException(Exception e)
     {
@@ -31,7 +35,8 @@ class Program
         return new DisposableObject();
     }
     
-    static int Main(string[] args)
+    [Fact]
+    public static int TestEntryPoint()
     {
         int result = 0;
 

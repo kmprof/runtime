@@ -1,19 +1,23 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using System.Collections.Generic;
 using System.Security.Cryptography.Tests;
 using Test.Cryptography;
 using Xunit;
 
 namespace System.Security.Cryptography.EcDiffieHellman.Tests
 {
-#if NETCOREAPP
+#if NET
     public partial class ECDiffieHellmanTests
     {
         // On CentOS, secp224r1 (also called nistP224) appears to be disabled. To prevent test failures on that platform,
         // probe for this capability before depending on it.
         internal static bool ECDsa224Available =>
             ECDiffieHellmanFactory.IsCurveValid(new Oid(ECDSA_P224_OID_VALUE));
+
+        internal static bool CanDeriveNewPublicKey { get; }
+            = EcDiffieHellman.Tests.ECDiffieHellmanFactory.CanDeriveNewPublicKey;
 
         [Theory, MemberData(nameof(TestCurvesFull))]
         public static void TestNamedCurves(CurveDef curveDef)
@@ -44,8 +48,11 @@ namespace System.Security.Cryptography.EcDiffieHellman.Tests
                 return;
 
             // An exception may be thrown during Create() if the Oid is bad, or later during native calls
-            Assert.Throws<PlatformNotSupportedException>(
-                () => ECDiffieHellmanFactory.Create(curveDef.Curve).ExportParameters(false));
+            Assert.Throws<PlatformNotSupportedException>(() =>
+            {
+                using ECDiffieHellman ecdh = ECDiffieHellmanFactory.Create(curveDef.Curve);
+                ecdh.ExportParameters(false);
+            });
         }
 
         [Theory, MemberData(nameof(TestCurvesFull))]
@@ -151,6 +158,7 @@ namespace System.Security.Cryptography.EcDiffieHellman.Tests
         }
 
         [Fact]
+        [SkipOnPlatform(TestPlatforms.Android, "Android does not validate curve parameters")]
         public static void TestExplicitImportValidationNegative()
         {
             if (!ECDiffieHellmanFactory.ExplicitCurvesSupported)
@@ -250,7 +258,7 @@ namespace System.Security.Cryptography.EcDiffieHellman.Tests
             }
         }
 
-        [ConditionalFact(nameof(ECDsa224Available))]
+        [ConditionalFact(typeof(ECDiffieHellmanTests), nameof(ECDsa224Available))]
         public static void TestNamedImportValidationNegative()
         {
             if (!ECDiffieHellmanFactory.ExplicitCurvesSupported)
@@ -311,7 +319,7 @@ namespace System.Security.Cryptography.EcDiffieHellman.Tests
         [Fact]
         public static void TestExplicitCurveImportOnUnsupportedPlatform()
         {
-            if (ECDiffieHellmanFactory.ExplicitCurvesSupported)
+            if (ECDiffieHellmanFactory.ExplicitCurvesSupported || ECDiffieHellmanFactory.ExplicitCurvesSupportFailOnUseOnly)
             {
                 return;
             }
@@ -335,7 +343,7 @@ namespace System.Security.Cryptography.EcDiffieHellman.Tests
             }
         }
 
-        [ConditionalFact(nameof(ECDsa224Available))]
+        [ConditionalFact(typeof(ECDiffieHellmanTests), nameof(ECDsa224Available))]
         public static void TestNamedCurveWithExplicitKey()
         {
             if (!ECDiffieHellmanFactory.ExplicitCurvesSupported)
@@ -385,7 +393,7 @@ namespace System.Security.Cryptography.EcDiffieHellman.Tests
             }
         }
 
-        [Fact]
+        [ConditionalFact(typeof(ECDiffieHellmanTests), nameof(CanDeriveNewPublicKey))]
         public static void ImportFromPrivateOnlyKey()
         {
             byte[] expectedX = "00d45615ed5d37fde699610a62cd43ba76bedd8f85ed31005fe00d6450fbbd101291abd96d4945a8b57bc73b3fe9f4671105309ec9b6879d0551d930dac8ba45d255".HexToByteArray();
@@ -406,6 +414,50 @@ namespace System.Security.Cryptography.EcDiffieHellman.Tests
                 Assert.Equal(expectedX, exportedParameters.Q.X);
                 Assert.Equal(expectedY, exportedParameters.Q.Y);
                 Assert.Equal(limitedPrivateParameters.D, exportedParameters.D);
+            }
+        }
+
+        [Theory]
+        [MemberData(nameof(NamedCurves))]
+        public static void OidPresentOnCurveMiscased(ECCurve curve)
+        {
+            ECCurve miscasedCurve = ECCurve.CreateFromFriendlyName(InvertStringCase(curve.Oid.FriendlyName));
+            Assert.NotEqual(miscasedCurve.Oid.FriendlyName, curve.Oid.FriendlyName);
+            Assert.Equal(miscasedCurve.Oid.FriendlyName, curve.Oid.FriendlyName, ignoreCase: true);
+
+            using (ECDiffieHellman ecdh = ECDiffieHellmanFactory.Create())
+            {
+                ecdh.GenerateKey(miscasedCurve);
+                ECParameters exportedParameters = ecdh.ExportParameters(false);
+                Assert.Equal(curve.Oid.Value, exportedParameters.Curve.Oid.Value);
+
+                exportedParameters.Curve = miscasedCurve;
+
+                // Assert.NoThrow. Make sure we can import the mis-cased curve.
+                ecdh.ImportParameters(exportedParameters);
+            }
+        }
+
+        public static IEnumerable<object[]> NamedCurves
+        {
+            get
+            {
+                yield return new object[] { ECCurve.NamedCurves.nistP256 };
+                yield return new object[] { ECCurve.NamedCurves.nistP384 };
+                yield return new object[] { ECCurve.NamedCurves.nistP521 };
+                yield return new object[] { ECCurve.CreateFromFriendlyName("ECDH_P256") };
+                yield return new object[] { ECCurve.CreateFromFriendlyName("ECDH_P384") };
+                yield return new object[] { ECCurve.CreateFromFriendlyName("ECDH_P521") };
+
+                if (ECDiffieHellmanFactory.IsCurveValid(ECCurve.NamedCurves.brainpoolP160r1.Oid))
+                {
+                    yield return new object[] { ECCurve.NamedCurves.brainpoolP160r1 };
+                }
+
+                if (ECDiffieHellmanFactory.IsCurveValid(ECCurve.NamedCurves.brainpoolP160t1.Oid))
+                {
+                    yield return new object[] { ECCurve.NamedCurves.brainpoolP160t1 };
+                }
             }
         }
 
@@ -458,6 +510,72 @@ namespace System.Security.Cryptography.EcDiffieHellman.Tests
             ECParameters paramSecondExport = ec.ExportExplicitParameters(curveDef.IncludePrivate);
             AssertEqual(parameters, paramSecondExport);
         }
+
+        [Theory]
+        [MemberData(nameof(NistEccCdhPrimeCurveVectors))]
+        public static void EcdhKeyAgreement_PrimeCurve_MatchesKnownSharedSecret(
+            string curveName, string curveOid,
+            string qCavsXHex, string qCavsYHex,
+            string dIutHex, string qIutXHex, string qIutYHex,
+            string expectedZHex)
+        {
+            _ = curveName;
+            ECCurve curve = ECCurve.CreateFromValue(curveOid);
+
+            using (ECDiffieHellman iut = ECDiffieHellmanFactory.Create())
+            using (ECDiffieHellman cavs = ECDiffieHellmanFactory.Create())
+            {
+                iut.ImportParameters(new ECParameters
+                {
+                    Curve = curve,
+                    D = dIutHex.HexToByteArray(),
+                    Q = new ECPoint
+                    {
+                        X = qIutXHex.HexToByteArray(),
+                        Y = qIutYHex.HexToByteArray(),
+                    },
+                });
+
+                cavs.ImportParameters(new ECParameters
+                {
+                    Curve = curve,
+                    Q = new ECPoint
+                    {
+                        X = qCavsXHex.HexToByteArray(),
+                        Y = qCavsYHex.HexToByteArray(),
+                    },
+                });
+
+                byte[] derivedZ = iut.DeriveRawSecretAgreement(cavs.PublicKey);
+                Assert.Equal(expectedZHex.HexToByteArray(), derivedZ);
+            }
+        }
+
+        // NIST SP 800-56A ECCCDH vectors (CAVS 14.1), P-256
+        // Source: https://csrc.nist.gov/projects/cryptographic-algorithm-validation-program
+        public static TheoryData<string, string, string, string, string, string, string, string> NistEccCdhPrimeCurveVectors => new()
+        {
+            // P-256, COUNT=0
+            {
+                "P-256", "1.2.840.10045.3.1.7",
+                "700c48f77f56584c5cc632ca65640db91b6bacce3a4df6b42ce7cc838833d287",
+                "db71e509e3fd9b060ddb20ba5c51dcc5948d46fbf640dfe0441782cab85fa4ac",
+                "7d7dc5f71eb29ddaf80d6214632eeae03d9058af1fb6d22ed80badb62bc1a534",
+                "ead218590119e8876b29146ff89ca61770c4edbbf97d38ce385ed281d8a6b230",
+                "28af61281fd35e2fa7002523acc85a429cb06ee6648325389f59edfce1405141",
+                "46fc62106420ff012e54a434fbdd2d25ccc5852060561e68040dd7778997bd7b"
+            },
+            // P-256, COUNT=1
+            {
+                "P-256", "1.2.840.10045.3.1.7",
+                "809f04289c64348c01515eb03d5ce7ac1a8cb9498f5caa50197e58d43a86a7ae",
+                "b29d84e811197f25eba8f5194092cb6ff440e26d4421011372461f579271cda3",
+                "38f65d6dce47676044d58ce5139582d568f64bb16098d179dbab07741dd5caf5",
+                "119f2f047902782ab0c9e27a54aff5eb9b964829ca99c06b02ddba95b0a3f6d0",
+                "8f52b726664cac366fc98ac7a012b2682cbd962e5acb544671d41b9445704d1d",
+                "057d636096cb80b67a8c038c890e887d1adfa4195e9b3ce241c8a778c59cda67"
+            },
+        };
     }
 #endif
 }

@@ -11,7 +11,7 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
 {
     using Aes = System.Security.Cryptography.Aes;
 
-    [SkipOnMono("Not supported on Browser", TestPlatforms.Browser)]
+    [SkipOnPlatform(TestPlatforms.Browser, "Not supported on Browser")]
     public partial class AesCipherTests
     {
         [Fact]
@@ -78,7 +78,7 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
             TestAesDecrypt(CipherMode.CBC, s_aes256Key, s_aes256CbcIv, encryptedBytes, s_multiBlockBytes);
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Fact]
         public static void DecryptKnownCFB128_256()
         {
             byte[] encryptedBytes = new byte[]
@@ -122,7 +122,7 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
             TestAesDecrypt(CipherMode.ECB, s_aes192Key, null, encryptedBytes, s_multiBlockBytes);
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Fact]
         public static void DecryptKnownCFB128_192()
         {
             byte[] encryptedBytes = new byte[]
@@ -144,7 +144,7 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
             TestAesDecrypt(CipherMode.CFB, s_aes192Key, s_aes256CbcIv, encryptedBytes, s_multiBlockBytes, 128);
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Fact]
         public static void DecryptKnownCFB128_128()
         {
             byte[] encryptedBytes = new byte[]
@@ -164,6 +164,35 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
             };
 
             TestAesDecrypt(CipherMode.CFB, s_aes128Key, s_aes256CbcIv, encryptedBytes, s_multiBlockBytes, 128);
+        }
+
+        [Fact]
+        public static void SetKey_Sanity()
+        {
+            using (Aes one = AesFactory.Create())
+            using (Aes two = AesFactory.Create())
+            {
+                byte[] key = new byte[16];
+                RandomNumberGenerator.Fill(key);
+                one.SetKey(key);
+                two.Key = key;
+                two.IV = one.IV;
+
+                using (ICryptoTransform e1 = one.CreateEncryptor())
+                using (ICryptoTransform e2 = two.CreateEncryptor())
+                using (ICryptoTransform d1 = one.CreateDecryptor())
+                using (ICryptoTransform d2 = two.CreateDecryptor())
+                {
+                    byte[] c1 = e1.TransformFinalBlock(key, 0, key.Length);
+                    byte[] c2 = e2.TransformFinalBlock(key, 0, key.Length);
+                    Assert.Equal(c1, c2);
+
+                    byte[] p1 = d1.TransformFinalBlock(c1, 0, c1.Length);
+                    byte[] p2 = d2.TransformFinalBlock(c2, 0, c2.Length);
+                    Assert.Equal(p1, p2);
+                    Assert.Equal(key, p1);
+                }
+            }
         }
 
         [Fact]
@@ -343,7 +372,7 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
                 cipherBytes: new byte[] { 0x6C, 0xD0, 0x25, 0x13, 0xE8, 0xD4, 0xDC, 0x98, 0x6B, 0x4A, 0xFE, 0x08, 0x7A, 0x60, 0xBD, 0x0C });
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Fact]
         public static void VerifyKnownTransform_CFB128_8_NoPadding()
         {
             TestAesTransformDirectKey(
@@ -356,7 +385,7 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
                 8);
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Fact]
         public static void VerifyKnownTransform_CFB128_128_NoPadding()
         {
             TestAesTransformDirectKey(
@@ -393,7 +422,7 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
                 cipherBytes: new byte[] { 0x19, 0x46, 0xDA, 0xBF, 0x6A, 0x03, 0xA2, 0xA2, 0xC3, 0xD0, 0xB0, 0x50, 0x80, 0xAE, 0xD6, 0xFC });
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Fact]
         public static void VerifyKnownTransform_CFB128_256_NoPadding()
         {
             TestAesTransformDirectKey(
@@ -431,7 +460,7 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
                 cipherBytes: new byte[] { 0x0E, 0xDD, 0x33, 0xD3, 0xC6, 0x21, 0xE5, 0x46, 0x45, 0x5B, 0xD8, 0xBA, 0x14, 0x18, 0xBE, 0xC8 });
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Fact]
         public static void VerifyKnownTransform_CFB128_128_NoPadding_2()
         {
             TestAesTransformDirectKey(
@@ -456,7 +485,7 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
                 cipherBytes: new byte[] { 0x3A, 0xD7, 0x8E, 0x72, 0x6C, 0x1E, 0xC0, 0x2B, 0x7E, 0xBF, 0xE9, 0x2B, 0x23, 0xD9, 0xEC, 0x34 });
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Fact]
         public static void VerifyKnownTransform_CFB128_128_NoPadding_3()
         {
             TestAesTransformDirectKey(
@@ -481,7 +510,7 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
                 cipherBytes: new byte[] { 0xDE, 0x88, 0x5D, 0xC8, 0x7F, 0x5A, 0x92, 0x59, 0x40, 0x82, 0xD0, 0x2C, 0xC1, 0xE1, 0xB4, 0x2C });
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Fact]
         public static void VerifyKnownTransform_CFB128_192_NoPadding()
         {
             TestAesTransformDirectKey(
@@ -519,7 +548,7 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
                 cipherBytes: new byte[] { 0x6C, 0xD0, 0x25, 0x13, 0xE8, 0xD4, 0xDC, 0x98, 0x6B, 0x4A, 0xFE, 0x08, 0x7A, 0x60, 0xBD, 0x0C });
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Fact]
         public static void VerifyKnownTransform_CFB128_192_NoPadding_2()
         {
             TestAesTransformDirectKey(
@@ -567,7 +596,8 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
                 Assert.Throws<CryptographicException>(() =>
                 {
                     using (MemoryStream input = new MemoryStream(encryptedBytes))
-                    using (CryptoStream cryptoStream = new CryptoStream(input, aes.CreateDecryptor(), CryptoStreamMode.Read))
+                    using (ICryptoTransform decryptor = aes.CreateDecryptor())
+                    using (CryptoStream cryptoStream = new CryptoStream(input, decryptor, CryptoStreamMode.Read))
                     using (MemoryStream output = new MemoryStream())
                     {
                         cryptoStream.CopyTo(output);
@@ -616,7 +646,8 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
                 Assert.Throws<CryptographicException>(() =>
                 {
                     using (MemoryStream input = new MemoryStream(encryptedBytes))
-                    using (CryptoStream cryptoStream = new CryptoStream(input, aes.CreateDecryptor(), CryptoStreamMode.Read))
+                    using (ICryptoTransform decryptor = aes.CreateDecryptor())
+                    using (CryptoStream cryptoStream = new CryptoStream(input, decryptor, CryptoStreamMode.Read))
                     using (MemoryStream output = new MemoryStream())
                     {
                         cryptoStream.CopyTo(output);
@@ -641,7 +672,7 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
                 feedbackSize: 8);
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Fact]
         public static void VerifyKnownTransform_CFB128_128_NoPadding_4_Fails()
         {
             Assert.Throws<CryptographicException>(() =>
@@ -656,7 +687,7 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
             );
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Fact]
         public static void VerifyKnownTransform_CFB128_128_PKCS7_4()
         {
             TestAesTransformDirectKey(
@@ -790,7 +821,7 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
                 feedbackSize: 8);
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Fact]
         public static void VerifyKnownTransform_CFB128_128_NoPadding_0()
         {
             // NIST CAVP AESMMT.ZIP CFB128MMT128.rsp, [ENCRYPT] COUNT=0
@@ -804,7 +835,7 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
                 feedbackSize: 128);
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Fact]
         public static void VerifyKnownTransform_CFB128_128_NoPadding_1_Extended()
         {
             // NIST CAVP AESMMT.ZIP CFB128MMT128.rsp, [ENCRYPT] COUNT=1
@@ -818,7 +849,7 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
                 feedbackSize: 128);
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Fact]
         public static void VerifyKnownTransform_CFB128_192_NoPadding_0_Extended()
         {
             // NIST CAVP AESMMT.ZIP CFB128MMT192.rsp, [ENCRYPT] COUNT=0
@@ -832,7 +863,7 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
                 feedbackSize: 128);
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Fact]
         public static void VerifyKnownTransform_CFB128_192_NoPadding_1_Extended()
         {
             // NIST CAVP AESMMT.ZIP CFB128MMT192.rsp, [ENCRYPT] COUNT=1
@@ -846,7 +877,7 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
                 feedbackSize: 128);
         }
 
-        [ConditionalTheory(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Theory]
         [InlineData(CipherMode.CBC, 0)]
         [InlineData(CipherMode.CFB, 128)]
         [InlineData(CipherMode.CFB, 8)]
@@ -876,7 +907,7 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
             }
         }
 
-        [ConditionalTheory(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Theory]
         [InlineData(CipherMode.CBC, 0)]
         [InlineData(CipherMode.CFB, 128)]
         [InlineData(CipherMode.CFB, 8)]
@@ -911,7 +942,7 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
             }
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Fact]
         public static void VerifyKnownTransform_CFB128_256_NoPadding_0_Extended()
         {
             // NIST CAVP AESMMT.ZIP CFB128MMT256.rsp, [ENCRYPT] COUNT=0
@@ -925,7 +956,7 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
                 feedbackSize: 128);
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Fact]
         public static void VerifyKnownTransform_CFB128_256_NoPadding_1_Extended()
         {
             // NIST CAVP AESMMT.ZIP CFB128MMT256.rsp, [ENCRYPT] COUNT=1
@@ -939,17 +970,19 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
                 feedbackSize: 128);
         }
 
+        public static IEnumerable<object[]> AesZeroPadData
+        {
+            get
+            {
+                yield return new object[] { CipherMode.CBC };
+                yield return new object[] { CipherMode.CFB };
+            }
+        }
+
         [Theory]
-        [InlineData(CipherMode.CBC)]
-        [InlineData(CipherMode.CFB)]
+        [MemberData(nameof(AesZeroPadData))]
         public static void AesZeroPad(CipherMode cipherMode)
         {
-            if (cipherMode == CipherMode.CFB && PlatformDetection.IsWindows7)
-            {
-                // Windows 7 does not support CFB128.
-                return;
-            }
-
             byte[] decryptedBytes;
             byte[] expectedAnswer;
 
@@ -971,7 +1004,8 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
                 byte[] encryptedBytes;
 
                 using (MemoryStream input = new MemoryStream(s_multiBlockBytes))
-                using (CryptoStream cryptoStream = new CryptoStream(input, aes.CreateEncryptor(), CryptoStreamMode.Read))
+                using (ICryptoTransform encryptor = aes.CreateEncryptor())
+                using (CryptoStream cryptoStream = new CryptoStream(input, encryptor, CryptoStreamMode.Read))
                 using (MemoryStream output = new MemoryStream())
                 {
                     cryptoStream.CopyTo(output);
@@ -979,7 +1013,8 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
                 }
 
                 using (MemoryStream input = new MemoryStream(encryptedBytes))
-                using (CryptoStream cryptoStream = new CryptoStream(input, aes.CreateDecryptor(), CryptoStreamMode.Read))
+                using (ICryptoTransform decryptor = aes.CreateDecryptor())
+                using (CryptoStream cryptoStream = new CryptoStream(input, decryptor, CryptoStreamMode.Read))
                 using (MemoryStream output = new MemoryStream())
                 {
                     cryptoStream.CopyTo(output);
@@ -1037,7 +1072,8 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
             byte[] encryptedBytes;
 
             using (MemoryStream input = new MemoryStream(s_multiBlockBytes))
-            using (CryptoStream cryptoStream = new CryptoStream(input, aes.CreateEncryptor(), CryptoStreamMode.Read))
+            using (ICryptoTransform encryptor = aes.CreateEncryptor())
+            using (CryptoStream cryptoStream = new CryptoStream(input, encryptor, CryptoStreamMode.Read))
             using (MemoryStream output = new MemoryStream())
             {
                 cryptoStream.CopyTo(output);
@@ -1047,7 +1083,8 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
             Assert.NotEqual(s_multiBlockBytes, encryptedBytes);
 
             using (MemoryStream input = new MemoryStream(encryptedBytes))
-            using (CryptoStream cryptoStream = new CryptoStream(input, aes.CreateDecryptor(), CryptoStreamMode.Read))
+            using (ICryptoTransform decryptor = aes.CreateDecryptor())
+            using (CryptoStream cryptoStream = new CryptoStream(input, decryptor, CryptoStreamMode.Read))
             using (MemoryStream output = new MemoryStream())
             {
                 cryptoStream.CopyTo(output);
@@ -1066,6 +1103,7 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
             int? feedbackSize = default)
         {
             byte[] decryptedBytes;
+            byte[] oneShotDecryptedBytes = null;
 
             using (Aes aes = AesFactory.Create())
             {
@@ -1083,16 +1121,27 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
                 }
 
                 using (MemoryStream input = new MemoryStream(encryptedBytes))
-                using (CryptoStream cryptoStream = new CryptoStream(input, aes.CreateDecryptor(), CryptoStreamMode.Read))
+                using (ICryptoTransform decryptor = aes.CreateDecryptor())
+                using (CryptoStream cryptoStream = new CryptoStream(input, decryptor, CryptoStreamMode.Read))
                 using (MemoryStream output = new MemoryStream())
                 {
                     cryptoStream.CopyTo(output);
                     decryptedBytes = output.ToArray();
                 }
+
+                if (mode == CipherMode.ECB)
+                {
+                    oneShotDecryptedBytes = aes.DecryptEcb(encryptedBytes, aes.Padding);
+                }
             }
 
             Assert.NotEqual(encryptedBytes, decryptedBytes);
             Assert.Equal(expectedAnswer, decryptedBytes);
+
+            if (oneShotDecryptedBytes is not null)
+            {
+                Assert.Equal(expectedAnswer, oneShotDecryptedBytes);
+            }
         }
 
         private static void TestAesTransformDirectKey(
@@ -1106,11 +1155,14 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
         {
             byte[] liveEncryptBytes;
             byte[] liveDecryptBytes;
+            byte[] liveOneShotDecryptBytes = null;
+            byte[] liveOneShotEncryptBytes = null;
 
             using (Aes aes = AesFactory.Create())
             {
                 aes.Mode = cipherMode;
                 aes.Padding = paddingMode;
+                aes.Key = key;
 
                 if (feedbackSize.HasValue)
                 {
@@ -1119,16 +1171,43 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
 
                 liveEncryptBytes = AesEncryptDirectKey(aes, key, iv, plainBytes);
                 liveDecryptBytes = AesDecryptDirectKey(aes, key, iv, cipherBytes);
+
+                if (cipherMode == CipherMode.ECB)
+                {
+                    liveOneShotDecryptBytes = aes.DecryptEcb(cipherBytes, paddingMode);
+                    liveOneShotEncryptBytes = aes.EncryptEcb(plainBytes, paddingMode);
+                }
+                else if (cipherMode == CipherMode.CBC)
+                {
+                    liveOneShotDecryptBytes = aes.DecryptCbc(cipherBytes, iv, paddingMode);
+                    liveOneShotEncryptBytes = aes.EncryptCbc(plainBytes, iv, paddingMode);
+                }
+                else if (cipherMode == CipherMode.CFB)
+                {
+                    liveOneShotDecryptBytes = aes.DecryptCfb(cipherBytes, iv, paddingMode, feedbackSizeInBits: feedbackSize.Value);
+                    liveOneShotEncryptBytes = aes.EncryptCfb(plainBytes, iv, paddingMode, feedbackSizeInBits: feedbackSize.Value);
+                }
             }
 
             Assert.Equal(cipherBytes, liveEncryptBytes);
             Assert.Equal(plainBytes, liveDecryptBytes);
+
+            if (liveOneShotDecryptBytes is not null)
+            {
+                Assert.Equal(plainBytes, liveOneShotDecryptBytes);
+            }
+
+            if (liveOneShotEncryptBytes is not null)
+            {
+                Assert.Equal(cipherBytes, liveOneShotEncryptBytes);
+            }
         }
 
         private static byte[] AesEncryptDirectKey(Aes aes, byte[] key, byte[] iv, byte[] plainBytes)
         {
             using (MemoryStream output = new MemoryStream())
-            using (CryptoStream cryptoStream = new CryptoStream(output, aes.CreateEncryptor(key, iv), CryptoStreamMode.Write))
+            using (ICryptoTransform encryptor = aes.CreateEncryptor(key, iv))
+            using (CryptoStream cryptoStream = new CryptoStream(output, encryptor, CryptoStreamMode.Write))
             {
                 cryptoStream.Write(plainBytes, 0, plainBytes.Length);
                 cryptoStream.FlushFinalBlock();
@@ -1140,7 +1219,8 @@ namespace System.Security.Cryptography.Encryption.Aes.Tests
         private static byte[] AesDecryptDirectKey(Aes aes, byte[] key, byte[] iv, byte[] cipherBytes)
         {
             using (MemoryStream output = new MemoryStream())
-            using (CryptoStream cryptoStream = new CryptoStream(output, aes.CreateDecryptor(key, iv), CryptoStreamMode.Write))
+            using (ICryptoTransform decryptor = aes.CreateDecryptor(key, iv))
+            using (CryptoStream cryptoStream = new CryptoStream(output, decryptor, CryptoStreamMode.Write))
             {
                 cryptoStream.Write(cipherBytes, 0, cipherBytes.Length);
                 cryptoStream.FlushFinalBlock();

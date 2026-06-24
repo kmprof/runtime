@@ -4,12 +4,14 @@
 using System;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using TestLibrary;
+using Xunit;
 
 // Repro for issue fixed 18582 (also seein in 23309) -- stack overflow when remorphing
 // call with a lot of arguments and some CSEs when running with limited stack (as is
 // done when CLR is hosted by IIS).
 
-class GitHub_18582
+public class GitHub_18582
 {
     [MethodImpl(MethodImplOptions.NoInlining)]
     static void Consume(
@@ -105,7 +107,7 @@ class GitHub_18582
     [MethodImpl(MethodImplOptions.NoInlining)]
     static int q() => s_x + 1;
 
-    public static void Test()
+    internal static void Test()
     {
         int z = s_x;
         Consume(
@@ -114,91 +116,94 @@ class GitHub_18582
             q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
             q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
             q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(), 
-            z + 1, z + 1, z + 1, z + 1, z + 1, z + 1, z + 1, z + 1, z + 1, z + 1); 
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            q(), q(), q(), q(), q(), q(), q(), q(), q(), q(),
+            z + 1, z + 1, z + 1, z + 1, z + 1, z + 1, z + 1, z + 1, z + 1, z + 1);
     }
 
     static int s_x;
 
-    public static int Main()
+    [OuterLoop]
+    [SkipOnCoreClr("Test uses a thread with a small stack; under GC stress this causes too many failures", RuntimeTestModes.AnyJitOptimizationStress)]
+    [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsMultithreadingSupported))]
+    public static int TestEntryPoint()
     {
         s_x = 1;
         int expected = 8;

@@ -5,8 +5,9 @@
 // loops and (illegally) above the corresponding type initializer calls.
 
 using System.Runtime.CompilerServices;
+using Xunit;
 
-namespace N
+namespace GitHub_10780
 {
     public struct Pair
     {
@@ -16,7 +17,7 @@ namespace N
         public static Pair TenFour = new Pair() { Left = 10, Right = 4 };
     }
 
-    static class C
+    public static class C
     {
         static int Sum;
         static int Two;
@@ -41,7 +42,9 @@ namespace N
             }
         }
 
-        public static int Main(string[] args)
+        [OuterLoop]
+        [Fact]
+        public static int TestEntryPoint()
         {
             Sum = 0;
             SumNFourteens(7);  // Now Sum = 14 * 7 = 98 (and Two = 2)

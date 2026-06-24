@@ -4,10 +4,14 @@
 // This test illustrates a limitation in the JIT in that it will not promote
 // a struct that has a single double register. See https://github.com/dotnet/coreclr/issues/1161.
 
+
+namespace GitHub_1161;
+
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 
-class GitHub_1161
+public class GitHub_1161
 {
     struct Number
     {
@@ -25,7 +29,7 @@ class GitHub_1161
             return x.value + y.value;
         }
     }
-    class Program
+    public class Program
     {
         [MethodImpl(MethodImplOptions.NoInlining)]
         static int Test()
@@ -33,7 +37,8 @@ class GitHub_1161
             Number x = 4, y = 2;
             return (int)(x + y);
         }
-        static int Main()
+        [Fact]
+        public static int TestEntryPoint()
         {
             return (Test() == 6) ? 100 : -1;
         }

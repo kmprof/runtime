@@ -1,22 +1,28 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_24846;
+
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 
 unsafe public class GitHub_24846
 {
-    public static void TestCopy(byte* destination, byte* source)
+    internal static void TestCopy(byte* destination, byte* source)
     {
         Unsafe.CopyBlockUnaligned(destination, source, 0);
     }
 
-    public static void TestInit(byte* destination)
+    internal static void TestInit(byte* destination)
     {
         Unsafe.InitBlockUnaligned(destination, 0xff, 0);
     }
 
-    public static int Main(string[] args)
+    [Fact]
+    [ActiveIssue("https://github.com/dotnet/runtime/issues/54392", typeof(TestLibrary.PlatformDetection), nameof(TestLibrary.PlatformDetection.IsMonoInterpreter)), ActiveIssue("https://github.com/dotnet/runtime/issues/54392", typeof(TestLibrary.PlatformDetection), nameof(TestLibrary.PlatformDetection.IsAppleMobile))]
+    public static int TestEntryPoint()
     {
         int returnVal = 100;
         var destination = new byte[1];

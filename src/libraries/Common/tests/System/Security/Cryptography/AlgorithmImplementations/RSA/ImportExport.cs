@@ -7,7 +7,7 @@ using Xunit;
 
 namespace System.Security.Cryptography.Rsa.Tests
 {
-    [SkipOnMono("Not supported on Browser", TestPlatforms.Browser)]
+    [SkipOnPlatform(TestPlatforms.Browser, "Not supported on Browser")]
     public partial class ImportExport
     {
         public static bool Supports16384 { get; } = TestRsa16384();
@@ -66,10 +66,10 @@ namespace System.Security.Cryptography.Rsa.Tests
 
             // DP is the most likely to fail, the rest just otherwise ensure that Export
             // isn't losing data.
-            AssertKeyEquals(diminishedDPParameters, exported);
+            RSATestHelpers.AssertKeyEquals(diminishedDPParameters, exported);
         }
 
-        [Fact]
+        [ConditionalFact(typeof(ImportExport), nameof(ImportExport.Supports16384))]
         public static void LargeKeyImportExport()
         {
             RSAParameters imported = TestData.RSA16384Params;
@@ -94,7 +94,7 @@ namespace System.Security.Cryptography.Rsa.Tests
 
                 exported = rsa.ExportParameters(true);
 
-                AssertKeyEquals(imported, exported);
+                RSATestHelpers.AssertKeyEquals(imported, exported);
             }
         }
 
@@ -119,7 +119,7 @@ namespace System.Security.Cryptography.Rsa.Tests
 
             // Exponent is the most likely to fail, the rest just otherwise ensure that Export
             // isn't losing data.
-            AssertKeyEquals(unusualExponentParameters, exported);
+            RSATestHelpers.AssertKeyEquals(unusualExponentParameters, exported);
         }
 
         [Fact]
@@ -136,7 +136,7 @@ namespace System.Security.Cryptography.Rsa.Tests
                 exportedPublic = rsa.ExportParameters(false);
             }
 
-            AssertKeyEquals(imported, exported);
+            RSATestHelpers.AssertKeyEquals(imported, exported);
 
             Assert.Equal(exportedPublic.Modulus, imported.Modulus);
             Assert.Equal(exportedPublic.Exponent, imported.Exponent);
@@ -169,7 +169,7 @@ namespace System.Security.Cryptography.Rsa.Tests
                 Assert.Equal(imported.Modulus.Length * 8, rsa.KeySize);
 
                 exported = rsa.ExportParameters(true);
-                AssertKeyEquals(imported, exported);
+                RSATestHelpers.AssertKeyEquals(imported, exported);
             }
         }
 
@@ -207,18 +207,18 @@ namespace System.Security.Cryptography.Rsa.Tests
                 RSAParameters exportedPrivate3 = rsa.ExportParameters(true);
                 RSAParameters exportedPublic3 = rsa.ExportParameters(false);
 
-                AssertKeyEquals(imported, exportedPrivate);
+                RSATestHelpers.AssertKeyEquals(imported, exportedPrivate);
 
                 Assert.Equal(imported.Modulus, exportedPublic.Modulus);
                 Assert.Equal(imported.Exponent, exportedPublic.Exponent);
                 Assert.Null(exportedPublic.D);
                 ValidateParameters(ref exportedPublic);
 
-                AssertKeyEquals(exportedPrivate, exportedPrivate2);
-                AssertKeyEquals(exportedPrivate, exportedPrivate3);
+                RSATestHelpers.AssertKeyEquals(exportedPrivate, exportedPrivate2);
+                RSATestHelpers.AssertKeyEquals(exportedPrivate, exportedPrivate3);
 
-                AssertKeyEquals(exportedPublic, exportedPublic2);
-                AssertKeyEquals(exportedPublic, exportedPublic3);
+                RSATestHelpers.AssertKeyEquals(exportedPublic, exportedPublic2);
+                RSATestHelpers.AssertKeyEquals(exportedPublic, exportedPublic3);
             }
         }
 
@@ -311,32 +311,20 @@ namespace System.Security.Cryptography.Rsa.Tests
             }
         }
 
-        internal static void AssertKeyEquals(in RSAParameters expected, in RSAParameters actual)
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public static void ImportZeroModulus(bool includePrivateParameters)
         {
-            Assert.Equal(expected.Modulus, actual.Modulus);
-            Assert.Equal(expected.Exponent, actual.Exponent);
+            RSAParameters zeroModulus = CopyRSAParameters(TestData.RSA2048Params);
+            zeroModulus.Modulus.AsSpan().Clear();
 
-            Assert.Equal(expected.P, actual.P);
-            Assert.Equal(expected.DP, actual.DP);
-            Assert.Equal(expected.Q, actual.Q);
-            Assert.Equal(expected.DQ, actual.DQ);
-            Assert.Equal(expected.InverseQ, actual.InverseQ);
-
-            if (expected.D == null)
+            if (!includePrivateParameters)
             {
-                Assert.Null(actual.D);
+                zeroModulus = MakePublic(zeroModulus);
             }
-            else
-            {
-                Assert.NotNull(actual.D);
 
-                // If the value matched expected, take that as valid and shortcut the math.
-                // If it didn't, we'll test that the value is at least legal.
-                if (!expected.D.SequenceEqual(actual.D))
-                {
-                    VerifyDValue(actual);
-                }
-            }
+            Assert.ThrowsAny<CryptographicException>(() => RSAFactory.Create(zeroModulus));
         }
 
         internal static void ValidateParameters(ref RSAParameters rsaParams)
@@ -377,58 +365,15 @@ namespace System.Security.Cryptography.Rsa.Tests
             };
         }
 
-        private static void VerifyDValue(in RSAParameters rsaParams)
-        {
-            if (rsaParams.P == null)
-            {
-                return;
-            }
-
-            // Verify that the formula (D * E) % LCM(p - 1, q - 1) == 1
-            // is true.
-            //
-            // This is NOT the same as saying D = ModInv(E, LCM(p - 1, q - 1)),
-            // because D = ModInv(E, (p - 1) * (q - 1)) is a valid choice, but will
-            // still work through this formula.
-            BigInteger p = PositiveBigInteger(rsaParams.P);
-            BigInteger q = PositiveBigInteger(rsaParams.Q);
-            BigInteger e = PositiveBigInteger(rsaParams.Exponent);
-            BigInteger d = PositiveBigInteger(rsaParams.D);
-
-            BigInteger lambda = LeastCommonMultiple(p - 1, q - 1);
-
-            BigInteger modProduct = (d * e) % lambda;
-            Assert.Equal(BigInteger.One, modProduct);
-        }
-
-        private static BigInteger LeastCommonMultiple(BigInteger a, BigInteger b)
-        {
-            BigInteger gcd = BigInteger.GreatestCommonDivisor(a, b);
-            return BigInteger.Abs(a) / gcd * BigInteger.Abs(b);
-        }
-
-        private static BigInteger PositiveBigInteger(byte[] bigEndianBytes)
-        {
-            byte[] littleEndianBytes;
-
-            if (bigEndianBytes[0] >= 0x80)
-            {
-                // Insert a padding 00 byte so the number is treated as positive.
-                littleEndianBytes = new byte[bigEndianBytes.Length + 1];
-                Buffer.BlockCopy(bigEndianBytes, 0, littleEndianBytes, 1, bigEndianBytes.Length);
-            }
-            else
-            {
-                littleEndianBytes = (byte[])bigEndianBytes.Clone();
-
-            }
-
-            Array.Reverse(littleEndianBytes);
-            return new BigInteger(littleEndianBytes);
-        }
-
         private static bool TestRsa16384()
         {
+            if (PlatformDetection.IsAndroid)
+            {
+                // We cannot detect this on Android at the moment. Even attempting to generate or import a 16K RSA key
+                // may leave the error queue in the incorrect state. See https://github.com/google/conscrypt/issues/1507
+                return false;
+            }
+
             try
             {
                 using (RSA rsa = RSAFactory.Create())
@@ -438,11 +383,28 @@ namespace System.Security.Cryptography.Rsa.Tests
 
                 return true;
             }
-            catch (CryptographicException)
+            catch (Exception e) when (e is CryptographicException or PlatformNotSupportedException)
             {
-                // The key is too big for this platform.
+                // The key is too big for this platform or the platform is not supported.
                 return false;
             }
+        }
+
+        private static RSAParameters CopyRSAParameters(in RSAParameters rsaParams)
+        {
+            static byte[] CopyBytes(byte[] data) => data is null ? null : data.AsSpan().ToArray();
+
+            return new RSAParameters
+            {
+                Modulus = CopyBytes(rsaParams.Modulus),
+                Exponent = CopyBytes(rsaParams.Exponent),
+                D = CopyBytes(rsaParams.D),
+                P = CopyBytes(rsaParams.P),
+                Q = CopyBytes(rsaParams.Q),
+                DP = CopyBytes(rsaParams.DP),
+                DQ = CopyBytes(rsaParams.DQ),
+                InverseQ = CopyBytes(rsaParams.InverseQ),
+            };
         }
     }
 }

@@ -1,10 +1,14 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_10621;
+
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 
-class GitHub_10621
+public class GitHub_10621
 {
     [MethodImpl(MethodImplOptions.NoInlining)]
     static int F(int x) 
@@ -14,7 +18,9 @@ class GitHub_10621
 
     // An empty try with nested try finallys where
     // the inner finally cannot be cloned.
-    public static int Main()
+    [OuterLoop]
+    [Fact]
+    public static int TestEntryPoint()
     {
         int x = 0;
         try {

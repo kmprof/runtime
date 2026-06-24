@@ -1,12 +1,16 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace Runtime_36584;
+
 using System;
+using Xunit;
 
 // Finally cloning creates new throw merge candidates that
 // need to be properly counted.
 
-class Runtime_36584
+public class Runtime_36584
 {
     static int x;
 
@@ -15,7 +19,8 @@ class Runtime_36584
         throw new Exception();
     }
 
-    public static int Main()
+    [Fact]
+    public static int TestEntryPoint()
     {
         x = 100;
 

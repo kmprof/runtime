@@ -1,10 +1,14 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_5047;
+
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 
-class Program
+public class Program
 {
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static float Get42()
@@ -26,7 +30,9 @@ class Program
         return x;
     }
 
-    static int Main()
+    [OuterLoop]
+    [Fact]
+    public static int TestEntryPoint()
     {
         const int Pass = 100;
         const int Fail = -1;

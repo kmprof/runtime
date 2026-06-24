@@ -3,8 +3,9 @@
 
 // Regression test for failure to maintain FieldSeq annotations in EarlyProp
 using System.Runtime.CompilerServices;
+using Xunit;
 
-namespace N
+namespace GitHub_6649
 {
     public static class C
     {
@@ -18,7 +19,8 @@ namespace N
             return arr[0] + arr[arr.Length];
         }
 
-        public static int Main(string[] args)
+        [Fact]
+        public static int TestEntryPoint()
         {
             try
             {

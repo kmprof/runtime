@@ -5,21 +5,20 @@ using System;
 using System.Runtime.InteropServices;
 using System.Reflection;
 using System.Threading;
+using Xunit;
+using TestLibrary;
 
 /*
  * Issue description:
   Running foreground threads do not prevent runtime shutdown
   on return from main
-
-Change description:
-  For CoreCLR: introduce BOOL waitForOtherThreads parameter
-  to Assembly::ExecuteMainMethod and exit conditionally;
-  For CoreRT aka NativeAOT: implement missing logic
 */
 
-public class Test
+public class Test_foreground_shutdown
 {
-    public static int Main()
+    [ActiveIssue("https://github.com/dotnet/runtime/issues/83658", TestRuntimes.CoreCLR)]
+    [Fact]
+    public static int TestEntryPoint()
     {
         new Thread(() =>
         {

@@ -1,7 +1,6 @@
-#include <config.h>
+#include "ep-rt-config.h"
 
 #ifdef ENABLE_PERFTRACING
-#include "ep-rt-config.h"
 #if !defined(EP_INCLUDE_SOURCE_FILES) || defined(EP_FORCE_INCLUDE_SOURCE_FILES)
 
 #define EP_IMPL_SAMPLE_PROFILER_GETTER_SETTER
@@ -14,7 +13,6 @@
 #define NUM_NANOSECONDS_IN_1_MS 1000000
 
 static volatile uint32_t _profiling_enabled = (uint32_t)false;
-static ep_rt_thread_handle_t _sampling_thread = NULL;
 static EventPipeProvider *_sampling_provider = NULL;
 static EventPipeEvent *_thread_time_event = NULL;
 static ep_rt_wait_event_handle_t _thread_shutdown_event;
@@ -48,11 +46,11 @@ sample_profiler_reset_time_granularity (void);
 
 static
 bool
-sample_profiler_load_dependecies (void);
+sample_profiler_load_dependencies (void);
 
 static
 void
-sample_profiler_unload_dependecies (void);
+sample_profiler_unload_dependencies (void);
 
 static
 void
@@ -80,20 +78,13 @@ sample_profiler_store_profiling_enabled (bool enabled)
 
 static
 inline
-bool
-sample_profiler_load_can_start_sampling (void)
-{
-	return (ep_rt_volatile_load_uint32_t (&_can_start_sampling) != 0) ? true : false;
-}
-
-static
-inline
 void
 sample_profiler_store_can_start_sampling (bool start_sampling)
 {
 	ep_rt_volatile_store_uint32_t (&_can_start_sampling, start_sampling ? 1 : 0);
 }
 
+#ifndef PERFTRACING_DISABLE_THREADS
 EP_RT_DEFINE_THREAD_FUNC (sampling_thread)
 {
 	EP_ASSERT (data != NULL);
@@ -118,6 +109,7 @@ EP_RT_DEFINE_THREAD_FUNC (sampling_thread)
 
 	return (ep_rt_thread_start_func_return_t)0;
 }
+#endif
 
 static
 void
@@ -153,7 +145,7 @@ sample_profiler_reset_time_granularity (void)
 
 static
 bool
-sample_profiler_load_dependecies (void)
+sample_profiler_load_dependencies (void)
 {
 #ifdef HOST_WIN32
 	if (_ref_count > 0)
@@ -178,7 +170,7 @@ sample_profiler_load_dependecies (void)
 
 static
 void
-sample_profiler_unload_dependecies (void)
+sample_profiler_unload_dependencies (void)
 {
 #ifdef HOST_WIN32
 	if (_multimedia_library_handle != NULL) {
@@ -199,23 +191,26 @@ sample_profiler_enable (void)
 
 	ep_requires_lock_held ();
 
-	const bool result = sample_profiler_load_dependecies ();
-	EP_ASSERT (result);
-
-	if (result && !sample_profiler_load_profiling_enabled ()) {
+	if (!sample_profiler_load_profiling_enabled ()) {
 		sample_profiler_store_profiling_enabled (true);
+
+		ep_rt_sample_profiler_enabled (_thread_time_event);
 
 		EP_ASSERT (!ep_rt_wait_event_is_valid (&_thread_shutdown_event));
 		ep_rt_wait_event_alloc (&_thread_shutdown_event, true, false);
 		if (!ep_rt_wait_event_is_valid (&_thread_shutdown_event))
-			EP_ASSERT (!"Unable to create sample profiler event.");
+			EP_UNREACHABLE ("Unable to create sample profiler event.");
 
+#ifndef PERFTRACING_DISABLE_THREADS
 		ep_rt_thread_id_t thread_id = ep_rt_uint64_t_to_thread_id_t (0);
-		if (!ep_rt_thread_create (sampling_thread, NULL, EP_THREAD_TYPE_SAMPLING, &thread_id))
-			EP_ASSERT (!"Unable to create sample profiler thread.");
+		if (!ep_rt_thread_create ((void *)sampling_thread, NULL, EP_THREAD_TYPE_SAMPLING, &thread_id))
+			EP_UNREACHABLE ("Unable to create sample profiler thread.");
+#endif
 
 		sample_profiler_set_time_granularity ();
 	}
+
+	ep_rt_sample_profiler_session_enabled ();
 }
 
 void
@@ -224,7 +219,7 @@ ep_sample_profiler_init (EventPipeProviderCallbackDataQueue *provider_callback_d
 	ep_requires_lock_held ();
 
 	if (!_sampling_provider) {
-		_sampling_provider = provider_create (ep_config_get_sample_profiler_provider_name_utf8 (), NULL, NULL, NULL, provider_callback_data_queue);
+		_sampling_provider = provider_create_register (ep_config_get_sample_profiler_provider_name_utf8 (), NULL, NULL, provider_callback_data_queue);
 		ep_raise_error_if_nok (_sampling_provider != NULL);
 		_thread_time_event = provider_add_event (
 			_sampling_provider,
@@ -254,7 +249,7 @@ ep_sample_profiler_shutdown (void)
 
 	EP_ASSERT (_ref_count == 0);
 
-	provider_free (_sampling_provider);
+	provider_unregister_delete (_sampling_provider);
 
 	_sampling_provider = NULL;
 	_thread_time_event = NULL;
@@ -273,6 +268,8 @@ ep_sample_profiler_enable (void)
 	// Check to see if the sample profiler event is enabled. If it is not, do not spin up the sampling thread.
 	if (!ep_event_is_enabled (_thread_time_event))
 		return;
+
+	sample_profiler_load_dependencies ();
 
 	if (_can_start_sampling)
 		sample_profiler_enable ();
@@ -299,6 +296,8 @@ ep_sample_profiler_disable (void)
 		// when profiling is disabled.
 		sample_profiler_store_profiling_enabled (false);
 
+		ep_rt_sample_profiler_disabled ();
+
 		// Wait for the sampling thread to clean itself up.
 		ep_rt_wait_event_wait (&_thread_shutdown_event, EP_INFINITE_WAIT, false);
 		ep_rt_wait_event_free (&_thread_shutdown_event);
@@ -306,7 +305,7 @@ ep_sample_profiler_disable (void)
 		if (_time_period_is_set)
 			sample_profiler_reset_time_granularity ();
 
-		sample_profiler_unload_dependecies ();
+		sample_profiler_unload_dependencies ();
 	}
 
 	--_ref_count;
@@ -347,7 +346,7 @@ ep_sample_profiler_get_sampling_rate (void)
 #endif /* !defined(EP_INCLUDE_SOURCE_FILES) || defined(EP_FORCE_INCLUDE_SOURCE_FILES) */
 #endif /* ENABLE_PERFTRACING */
 
-#ifndef EP_INCLUDE_SOURCE_FILES
+#if !defined(ENABLE_PERFTRACING) || (defined(EP_INCLUDE_SOURCE_FILES) && !defined(EP_FORCE_INCLUDE_SOURCE_FILES))
 extern const char quiet_linker_empty_file_warning_eventpipe_sample_profiler;
 const char quiet_linker_empty_file_warning_eventpipe_sample_profiler = 0;
 #endif

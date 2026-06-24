@@ -6,11 +6,15 @@
 // that the ABI is correctly implemented, but this test is here to enable
 // these cases to be manually verified (and diffed).
 //
+
+namespace Runtime_35976;
+
 using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.Arm;
+using Xunit;
 
-static class Runtime_35976
+public static class Runtime_35976
 {
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static uint fo1(uint value)
@@ -23,9 +27,9 @@ static class Runtime_35976
         return 0;
     }
 
-    static int Main()
+    [Fact]
+    public static void TestEntryPoint()
     {
         fo1(1);
-        return 100;
     }
 }

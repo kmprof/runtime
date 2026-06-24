@@ -2,14 +2,19 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 //
 
+
+namespace GitHub_22850;
+
 using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
+using Xunit;
 
 public static class GitHub_22850
 {
-    static int Main(string[] args)
+    [Fact]
+    public static int TestEntryPoint()
     {
         return test128((byte)90) ? 100 : -1;
     }

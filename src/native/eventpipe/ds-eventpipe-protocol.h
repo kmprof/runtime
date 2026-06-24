@@ -1,10 +1,9 @@
 #ifndef __DIAGNOSTICS_EVENTPIPE_PROTOCOL_H__
 #define __DIAGNOSTICS_EVENTPIPE_PROTOCOL_H__
 
-#include <config.h>
+#include "ds-rt-config.h"
 
 #ifdef ENABLE_PERFTRACING
-#include "ds-rt-config.h"
 #include "ds-types.h"
 #include "ds-ipc.h"
 
@@ -15,28 +14,42 @@
 #include "ds-getter-setter.h"
 
 /*
+ *  CollectTracing5 introduces additional provider configuration fields.
+ *  For backwards compatibility, these fields are optional and
+ *  these flags indicate which of the optional fields should be
+ *  deserialized from the IPC Stream.
+ */
+typedef enum
+{
+    EP_PROVIDER_OPTFIELD_NONE = 0,
+    EP_PROVIDER_OPTFIELD_EVENT_FILTER = 1,
+    EP_PROVIDER_OPTFIELD_TRACEPOINT_CONFIG = 2
+} EventPipeProviderOptionalFieldFlags;
+
+/*
 * EventPipeCollectTracingCommandPayload
+*
+* https://github.com/dotnet/diagnostics/blob/main/documentation/design-docs/ipc-protocol.md
 */
 
 // Command = 0x0202
+// Command = 0x0203
+// Command = 0x0204
+// Command = 0x0205
+// Command = 0x0206
 #if defined(DS_INLINE_GETTER_SETTER) || defined(DS_IMPL_EVENTPIPE_PROTOCOL_GETTER_SETTER)
 struct _EventPipeCollectTracingCommandPayload {
 #else
 struct _EventPipeCollectTracingCommandPayload_Internal {
 #endif
-	// The protocol buffer is defined as:
-	// X, Y, Z means encode bytes for X followed by bytes for Y followed by bytes for Z
-	// message = uint circularBufferMB, uint format, array<provider_config> providers
-	// uint = 4 little endian bytes
-	// wchar = 2 little endian bytes, UTF16 encoding
-	// array<T> = uint length, length # of Ts
-	// string = (array<char> where the last char must = 0) or (length = 0)
-	// provider_config = ulong keywords, uint logLevel, string provider_name, string filter_data
-
 	uint8_t *incoming_buffer;
-	ep_rt_provider_config_array_t provider_configs;
+	dn_vector_t *provider_configs;
 	uint32_t circular_buffer_size_in_mb;
 	EventPipeSerializationFormat serialization_format;
+	bool rundown_requested;
+	bool stackwalk_requested;
+	uint64_t rundown_keyword;
+	EventPipeSessionType session_type;
 };
 
 #if !defined(DS_INLINE_GETTER_SETTER) && !defined(DS_IMPL_EVENTPIPE_PROTOCOL_GETTER_SETTER)
@@ -50,44 +63,6 @@ ds_eventpipe_collect_tracing_command_payload_alloc (void);
 
 void
 ds_eventpipe_collect_tracing_command_payload_free (EventPipeCollectTracingCommandPayload *payload);
-
-/*
-* EventPipeCollectTracing2CommandPayload
-*/
-
-// Command = 0x0202
-#if defined(DS_INLINE_GETTER_SETTER) || defined(DS_IMPL_EVENTPIPE_PROTOCOL_GETTER_SETTER)
-struct _EventPipeCollectTracing2CommandPayload {
-#else
-struct _EventPipeCollectTracing2CommandPayload_Internal {
-#endif
-	// The protocol buffer is defined as:
-	// X, Y, Z means encode bytes for X followed by bytes for Y followed by bytes for Z
-	// message = uint circularBufferMB, uint format, array<provider_config> providers
-	// uint = 4 little endian bytes
-	// wchar = 2 little endian bytes, UTF16 encoding
-	// array<T> = uint length, length # of Ts
-	// string = (array<char> where the last char must = 0) or (length = 0)
-	// provider_config = ulong keywords, uint logLevel, string provider_name, string filter_data
-
-	uint8_t *incoming_buffer;
-	ep_rt_provider_config_array_t provider_configs;
-	uint32_t circular_buffer_size_in_mb;
-	EventPipeSerializationFormat serialization_format;
-	bool rundown_requested;
-};
-
-#if !defined(DS_INLINE_GETTER_SETTER) && !defined(DS_IMPL_EVENTPIPE_PROTOCOL_GETTER_SETTER)
-struct _EventPipeCollectTracing2CommandPayload {
-	uint8_t _internal [sizeof (struct _EventPipeCollectTracing2CommandPayload_Internal)];
-};
-#endif
-
-EventPipeCollectTracing2CommandPayload *
-ds_eventpipe_collect_tracing2_command_payload_alloc (void);
-
-void
-ds_eventpipe_collect_tracing2_command_payload_free (EventPipeCollectTracing2CommandPayload *payload);
 
 /*
 * EventPipeStopTracingCommandPayload

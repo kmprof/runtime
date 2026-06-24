@@ -46,8 +46,7 @@ namespace System.Security.Cryptography.Cng.Tests
             }
         }
 
-#if NETCOREAPP
-        [ConditionalTheory(nameof(ECExplicitCurvesSupported)), MemberData(nameof(TestCurves))]
+        [ConditionalTheory(typeof(ECDsaCngImportExportTests), nameof(ECExplicitCurvesSupported)), MemberData(nameof(TestCurves))]
         public static void TestHashRoundTrip(CurveDef curveDef)
         {
             // This test is in the cng only tests because OpenSsl does not provide the hash algorithm
@@ -69,6 +68,5 @@ namespace System.Security.Cryptography.Cng.Tests
                 Assert.Equal(0xFF, param2.Curve.Seed[0]);
             }
         }
-#endif
     }
 }

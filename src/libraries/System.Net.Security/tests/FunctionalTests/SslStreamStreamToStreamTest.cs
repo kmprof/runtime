@@ -11,6 +11,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.DotNet.XUnitExtensions;
 using Xunit;
 
 namespace System.Net.Security.Tests
@@ -19,27 +20,29 @@ namespace System.Net.Security.Tests
 
     public abstract class SslStreamStreamToStreamTest
     {
-        private readonly byte[] _sampleMsg = Encoding.UTF8.GetBytes("Sample Test Message");
+        private readonly byte[] _sampleMsg = "Sample Test Message"u8.ToArray();
 
-        protected static async Task WithServerCertificate(X509Certificate serverCertificate, Func<X509Certificate, string, Task> func)
+        internal string Name { get; private set; }
+        internal SslProtocols SslProtocol { get; private set; }
+
+        protected async Task WithServerCertificate(X509Certificate serverCertificate, Func<X509Certificate, string, Task> func)
         {
             X509Certificate certificate = serverCertificate ?? Configuration.Certificates.GetServerCertificate();
             try
             {
-                string name;
                 if (certificate is X509Certificate2 cert2)
                 {
-                    name = cert2.GetNameInfo(X509NameType.SimpleName, forIssuer: false);
+                    Name = cert2.GetNameInfo(X509NameType.SimpleName, forIssuer: false);
                 }
                 else
                 {
                     using (cert2 = new X509Certificate2(certificate))
                     {
-                        name = cert2.GetNameInfo(X509NameType.SimpleName, forIssuer: false);
+                        Name = cert2.GetNameInfo(X509NameType.SimpleName, forIssuer: false);
                     }
                 }
 
-                await func(certificate, name).ConfigureAwait(false);
+                await func(certificate, Name).ConfigureAwait(false);
             }
             finally
             {
@@ -62,12 +65,15 @@ namespace System.Net.Security.Tests
             using (X509Certificate2 clientCert = Configuration.Certificates.GetClientCertificate())
             {
                 yield return new object[] { new X509Certificate2(serverCert), new X509Certificate2(clientCert) };
-                yield return new object[] { new X509Certificate(serverCert.Export(X509ContentType.Pfx)), new X509Certificate(clientCert.Export(X509ContentType.Pfx)) };
+#pragma warning disable SYSLIB0057 // Test case is explicitly testing X509Certificate instances.
+                yield return new object[] { new X509Certificate(serverCert.Export(X509ContentType.Pfx), (string)null), new X509Certificate(clientCert.Export(X509ContentType.Pfx), (string)null) };
+#pragma warning restore SYSLIB0057
             }
         }
 
-        [Theory]
+        [ConditionalTheory]
         [MemberData(nameof(SslStream_StreamToStream_Authentication_Success_MemberData))]
+        [SkipOnPlatform(TestPlatforms.iOS | TestPlatforms.tvOS, "X509 certificate store is not supported on iOS or tvOS.")]
         public async Task SslStream_StreamToStream_Authentication_Success(X509Certificate serverCert = null, X509Certificate clientCert = null)
         {
             (Stream stream1, Stream stream2) = TestHelper.GetConnectedStreams();
@@ -75,6 +81,7 @@ namespace System.Net.Security.Tests
             using (var server = new SslStream(stream2, false, delegate { return true; }))
             {
                 await DoHandshake(client, server, serverCert, clientCert);
+                SslProtocol = client.SslProtocol;
                 Assert.True(client.IsAuthenticated);
                 Assert.True(server.IsAuthenticated);
             }
@@ -91,13 +98,14 @@ namespace System.Net.Security.Tests
             using (var server = new SslStream(stream2))
             using (var certificate = Configuration.Certificates.GetServerCertificate())
             {
-                Task t1 = client.AuthenticateAsClientAsync("incorrectServer");
+                Name = "incorrectServer";
+                Task t1 = client.AuthenticateAsClientAsync(Name);
                 Task t2 = server.AuthenticateAsServerAsync(certificate);
 
-                await Assert.ThrowsAsync<AuthenticationException>(() => t1);
+                await Assert.ThrowsAsync<AuthenticationException>(() => t1.WaitAsync(TestConfiguration.PassingTestTimeout));
                 try
                 {
-                    await t2;
+                    await t2.WaitAsync(TestConfiguration.PassingTestTimeout);
                 }
                 catch
                 {
@@ -125,9 +133,15 @@ namespace System.Net.Security.Tests
             }
         }
 
-        [Fact]
+        [ConditionalFact]
+        [SkipOnPlatform(TestPlatforms.iOS | TestPlatforms.tvOS, "X509 certificate store is not supported on iOS or tvOS.")]
         public async Task Read_CorrectlyUnlocksAfterFailure()
         {
+            if (PlatformDetection.IsNetworkFrameworkEnabled())
+            {
+                throw new SkipTestException("Reads and writes to inner streams are happening on different thread, so the exception does not propagate");
+            }
+
             (Stream stream1, Stream stream2) = TestHelper.GetConnectedStreams();
             var clientStream = new ThrowingDelegatingStream(stream1);
             using (var clientSslStream = new SslStream(clientStream, false, AllowAnyServerCertificate))
@@ -153,6 +167,7 @@ namespace System.Net.Security.Tests
         }
 
         [Fact]
+        [SkipOnPlatform(TestPlatforms.iOS | TestPlatforms.tvOS, "X509 certificate store is not supported on iOS or tvOS.")]
         public async Task Write_CorrectlyUnlocksAfterFailure()
         {
             (Stream stream1, Stream stream2) = TestHelper.GetConnectedStreams();
@@ -200,9 +215,15 @@ namespace System.Net.Security.Tests
             }
         }
 
-        [Fact]
+        [ConditionalFact]
+        [SkipOnPlatform(TestPlatforms.iOS | TestPlatforms.tvOS, "X509 certificate store is not supported on iOS or tvOS.")]
         public async Task Write_InvokedSynchronously()
         {
+            if (PlatformDetection.IsNetworkFrameworkEnabled())
+            {
+                throw new SkipTestException("Reads and writes to inner streams are happening on different thread, so we're calling InnerStream Read/Write async.");
+            }
+
             (Stream stream1, Stream stream2) = TestHelper.GetConnectedStreams();
             var clientStream = new PreReadWriteActionDelegatingStream(stream1);
             using (var clientSslStream = new SslStream(clientStream, false, AllowAnyServerCertificate))
@@ -242,7 +263,7 @@ namespace System.Net.Security.Tests
                 var serverBuffer = new byte[1];
                 Task serverReadTask = ReadAsync(serverSslStream, serverBuffer, 0, serverBuffer.Length);
                 await WriteAsync(serverSslStream, new byte[] { 1 }, 0, 1)
-                    .TimeoutAfter(TestConfiguration.PassingTestTimeoutMilliseconds);
+                    .WaitAsync(TestConfiguration.PassingTestTimeout);
 
                 // Shouldn't throw, the context is disposed now.
                 // Since the server read task is in progress, the read buffer is not returned to ArrayPool.
@@ -258,7 +279,7 @@ namespace System.Net.Security.Tests
                 // We're inconsistent as to whether the ObjectDisposedException is thrown directly
                 // or wrapped in an IOException.  For Begin/End, it's always wrapped; for Async,
                 // it's only wrapped on .NET Framework.
-                if (this is SslStreamStreamToStreamTest_BeginEnd || PlatformDetection.IsNetFramework)
+                if (this is SslStreamStreamToStreamTest_BeginEnd)
                 {
                     await Assert.ThrowsAsync<ObjectDisposedException>(() => serverReadTask);
                 }
@@ -450,7 +471,7 @@ namespace System.Net.Security.Tests
         protected override async Task DoHandshake(SslStream clientSslStream, SslStream serverSslStream, X509Certificate serverCertificate = null, X509Certificate clientCertificate = null)
         {
             X509CertificateCollection clientCerts = clientCertificate != null ? new X509CertificateCollection() { clientCertificate } : null;
-            await WithServerCertificate(serverCertificate, async(certificate, name) =>
+            await WithServerCertificate(serverCertificate, async (certificate, name) =>
             {
                 Task t1 = clientSslStream.AuthenticateAsClientAsync(name, clientCerts, SslProtocols.None, checkCertificateRevocation: false);
                 Task t2 = serverSslStream.AuthenticateAsServerAsync(certificate, clientCertificateRequired: clientCertificate != null, checkCertificateRevocation: false);
@@ -472,9 +493,19 @@ namespace System.Net.Security.Tests
             X509CertificateCollection clientCerts = clientCertificate != null ? new X509CertificateCollection() { clientCertificate } : null;
             await WithServerCertificate(serverCertificate, async (certificate, name) =>
             {
-                Task t1 = Task.Factory.FromAsync(clientSslStream.BeginAuthenticateAsClient(name, clientCerts, SslProtocols.None, checkCertificateRevocation: false, null, null), clientSslStream.EndAuthenticateAsClient);
-                Task t2 = Task.Factory.FromAsync(serverSslStream.BeginAuthenticateAsServer(certificate, clientCertificateRequired: clientCertificate != null, checkCertificateRevocation: false, null, null), serverSslStream.EndAuthenticateAsServer);
-                await TestConfiguration.WhenAllOrAnyFailedWithTimeout(t1, t2);
+                IAsyncResult clientBeginAuth = clientSslStream.BeginAuthenticateAsClient(name, clientCerts, SslProtocols.None, checkCertificateRevocation: false, null, null);
+                IAsyncResult serverBeginAuth = serverSslStream.BeginAuthenticateAsServer(certificate, clientCertificateRequired: clientCertificate != null, checkCertificateRevocation: false, null, null);
+                try
+                {
+                    Task t1 = Task.Factory.FromAsync(clientBeginAuth, clientSslStream.EndAuthenticateAsClient);
+                    Task t2 = Task.Factory.FromAsync(serverBeginAuth, serverSslStream.EndAuthenticateAsServer);
+                    await TestConfiguration.WhenAllOrAnyFailedWithTimeout(t1, t2);
+                }
+                finally
+                {
+                    clientBeginAuth.AsyncWaitHandle.Dispose();
+                    serverBeginAuth.AsyncWaitHandle.Dispose();
+                }
             });
         }
 
@@ -605,10 +636,13 @@ namespace System.Net.Security.Tests
                     TargetHost = name,
                     ClientCertificates = clientCerts,
                     EnabledSslProtocols = SslProtocols.None,
+                    CertificateRevocationCheckMode = X509RevocationMode.NoCheck
                 };
                 SslServerAuthenticationOptions serverOptions = new SslServerAuthenticationOptions()
                 {
-                    ServerCertificate = certificate, ClientCertificateRequired = clientCertificate != null,
+                    ServerCertificate = certificate,
+                    ClientCertificateRequired = clientCertificate != null,
+                    CertificateRevocationCheckMode = X509RevocationMode.NoCheck
                 };
                 Task t1 = Task.Run(() => clientSslStream.AuthenticateAsClient(clientOptions));
                 Task t2 = Task.Run(() => serverSslStream.AuthenticateAsServer(serverOptions));
@@ -622,10 +656,20 @@ namespace System.Net.Security.Tests
         protected override async Task DoHandshake(SslStream clientSslStream, SslStream serverSslStream, X509Certificate serverCertificate = null, X509Certificate clientCertificate = null)
         {
             X509CertificateCollection clientCerts = clientCertificate != null ? new X509CertificateCollection() { clientCertificate } : null;
-            await WithServerCertificate(serverCertificate, async(certificate, name) =>
+            await WithServerCertificate(serverCertificate, async (certificate, name) =>
             {
-                Task t1 = clientSslStream.AuthenticateAsClientAsync(new SslClientAuthenticationOptions() { TargetHost = name, ClientCertificates = clientCerts }, CancellationToken.None);
-                Task t2 = serverSslStream.AuthenticateAsServerAsync(new SslServerAuthenticationOptions() { ServerCertificate = certificate, ClientCertificateRequired = clientCertificate != null }, CancellationToken.None);
+                Task t1 = clientSslStream.AuthenticateAsClientAsync(new SslClientAuthenticationOptions()
+                {
+                    TargetHost = name,
+                    ClientCertificates = clientCerts,
+                    CertificateRevocationCheckMode = X509RevocationMode.NoCheck
+                }, CancellationToken.None);
+                Task t2 = serverSslStream.AuthenticateAsServerAsync(new SslServerAuthenticationOptions()
+                {
+                    ServerCertificate = certificate,
+                    ClientCertificateRequired = clientCertificate != null,
+                    CertificateRevocationCheckMode = X509RevocationMode.NoCheck
+                }, CancellationToken.None);
                 await TestConfiguration.WhenAllOrAnyFailedWithTimeout(t1, t2);
             });
         }

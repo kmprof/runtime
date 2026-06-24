@@ -21,6 +21,8 @@ using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
+using Xunit;
+using TestLibrary;
 
 
 public struct DT 
@@ -549,9 +551,15 @@ class RPInvokeTest
     }     
 }
 
-class Test 
+public class Test_Vector3Interop 
 {  
-    public static int Main() 
+    [ActiveIssue("https://github.com/dotnet/runtime/issues/90427", typeof(PlatformDetection), nameof(PlatformDetection.IsMonoLLVMFULLAOT))]
+    [ActiveIssue("https://github.com/dotnet/runtime/issues/90427", typeof(PlatformDetection), nameof(PlatformDetection.IsMonoMINIFULLAOT))]
+    [ActiveIssue("https://github.com/dotnet/runtime/issues/96051", typeof(PlatformDetection), nameof(PlatformDetection.IsMonoInterpreter), nameof(PlatformDetection.IsArm64Process), nameof(PlatformDetection.IsOSX))]
+    [ActiveIssue("https://github.com/dotnet/runtime/issues/92129", TestPlatforms.iOS | TestPlatforms.tvOS | TestPlatforms.MacCatalyst)]
+    [ActiveIssue("https://github.com/dotnet/runtime/issues/127827", typeof(TestLibrary.CoreClrConfigurationDetection), nameof(TestLibrary.CoreClrConfigurationDetection.IsGCStressC))]
+    [Fact]
+    public static int TestEntryPoint() 
     {
 
         if (!PInvokeTest.test()) 

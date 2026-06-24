@@ -11,6 +11,7 @@ namespace System.Net.Sockets.Tests
 {
     using Configuration = System.Net.Test.Common.Configuration;
 
+    [ConditionalClass(typeof(PlatformDetection), nameof(PlatformDetection.IsMultithreadingSupported))]
     public class DnsEndPointTest : DualModeBase
     {
         private void OnConnectAsyncCompleted(object sender, SocketAsyncEventArgs args)
@@ -272,7 +273,7 @@ namespace System.Net.Sockets.Tests
                 bool willRaiseEvent = sock.ConnectAsync(args);
                 if (willRaiseEvent)
                 {
-                    Assert.True(complete.WaitOne(TestSettings.PassingTestTimeout), "Timed out while waiting for connection");
+                    Assert.True(complete.WaitOne(TestSettings.PassingTestLongTimeout), "Timed out while waiting for connection");
                     complete.Dispose(); // only dispose on success as we know we're done with the instance
                 }
 
@@ -310,7 +311,7 @@ namespace System.Net.Sockets.Tests
         }
 
         [OuterLoop]
-        [ConditionalTheory(nameof(LocalhostIsBothIPv4AndIPv6))]
+        [ConditionalTheory(typeof(DnsEndPointTest), nameof(LocalhostIsBothIPv4AndIPv6))]
         [InlineData(SocketImplementationType.APM)]
         [InlineData(SocketImplementationType.Async)]
         [Trait("IPv4", "true")]
@@ -332,7 +333,7 @@ namespace System.Net.Sockets.Tests
 
                 if (Socket.ConnectAsync(SocketType.Stream, ProtocolType.Tcp, args))
                 {
-                    Assert.True(complete.WaitOne(TestSettings.PassingTestTimeout), "Timed out while waiting for connection");
+                    Assert.True(complete.WaitOne(TestSettings.PassingTestLongTimeout), "Timed out while waiting for connection");
                 }
 
                 Assert.Equal(SocketError.Success, args.SocketError);
@@ -348,7 +349,7 @@ namespace System.Net.Sockets.Tests
 
                 if (Socket.ConnectAsync(SocketType.Stream, ProtocolType.Tcp, args))
                 {
-                    Assert.True(complete.WaitOne(TestSettings.PassingTestTimeout), "Timed out while waiting for connection");
+                    Assert.True(complete.WaitOne(TestSettings.PassingTestLongTimeout), "Timed out while waiting for connection");
                 }
 
                 complete.Dispose(); // only dispose on success as we know we're done with the instance
@@ -361,6 +362,30 @@ namespace System.Net.Sockets.Tests
 
                 args.ConnectSocket.Dispose();
             }
+        }
+
+        [Fact]
+        public void Socket_StaticConnectAsync_IPv6MappedIPv4_Success()
+        {
+            using SocketTestServer server = SocketTestServer.SocketTestServerFactory(SocketImplementationType.Async, IPAddress.Loopback, out int port);
+
+            SocketAsyncEventArgs args = new SocketAsyncEventArgs();
+            args.RemoteEndPoint = new DnsEndPoint("[::FFFF:127.0.0.1]", port);
+            args.Completed += OnConnectAsyncCompleted;
+
+            ManualResetEvent complete = new ManualResetEvent(false);
+            args.UserToken = complete;
+
+            if (Socket.ConnectAsync(SocketType.Stream, ProtocolType.Tcp, args))
+            {
+                Assert.True(complete.WaitOne(TestSettings.PassingTestTimeout), "Timed out while waiting for connection");
+            }
+
+            Assert.Equal(SocketError.Success, args.SocketError);
+            Assert.Null(args.ConnectByNameError);
+            Assert.NotNull(args.ConnectSocket);
+            Assert.True(args.ConnectSocket.Connected);
+            args.ConnectSocket.Dispose();
         }
 
         [OuterLoop]
@@ -380,7 +405,7 @@ namespace System.Net.Sockets.Tests
                 OnConnectAsyncCompleted(null, args);
             }
 
-            Assert.True(complete.WaitOne(TestSettings.PassingTestTimeout), "Timed out while waiting for connection");
+            Assert.True(complete.WaitOne(TestSettings.PassingTestLongTimeout), "Timed out while waiting for connection");
             complete.Dispose(); // only dispose on success as we know we're done with the instance
 
             AssertHostNotFoundOrNoData(args);

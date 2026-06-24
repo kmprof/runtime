@@ -86,7 +86,7 @@ namespace System.Linq.Expressions.Tests
         }
 
         [Fact]
-        public void ThrowTypeWithGenericParamters()
+        public void ThrowTypeWithGenericParameters()
         {
             Type listType = typeof(List<>);
             Type listListListType = listType.MakeGenericType(listType.MakeGenericType(listType));
@@ -224,6 +224,7 @@ namespace System.Linq.Expressions.Tests
 
         [Theory, ClassData(typeof(CompilationTypes))]
         [ActiveIssue("https://github.com/mono/mono/issues/14925", TestRuntimes.Mono)]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/128164", typeof(PlatformDetection), nameof(PlatformDetection.IsBrowser), nameof(PlatformDetection.IsCoreCLR))]
         public void ExpressionsUnwrapeExternallyThrownRuntimeWrappedException(bool useInterpreter)
         {
             ParameterExpression exRWE = Expression.Variable(typeof(RuntimeWrappedException));
@@ -240,9 +241,8 @@ namespace System.Linq.Expressions.Tests
             Assert.Equal(4, func());
         }
 
-#if FEATURE_COMPILE
-
-        [Theory, ClassData(typeof(CompilationTypes))]
+        [ConditionalTheory(typeof(PlatformDetection), nameof(PlatformDetection.IsReflectionEmitSupported))]
+        [ClassData(typeof(CompilationTypes))]
         public void CatchFromExternallyThrownString(bool useInterpreter)
         {
             foreach (bool assemblyWraps in new []{false, true})
@@ -274,7 +274,6 @@ namespace System.Linq.Expressions.Tests
                 Assert.Equal("An Exceptional Exception!", func());
             }
         }
-#endif
 
         [Theory]
         [ClassData(typeof(CompilationTypes))]
@@ -818,7 +817,7 @@ namespace System.Linq.Expressions.Tests
         }
 
         [Theory, ClassData(typeof(CompilationTypes))]
-        public void FilterOverwiteExceptionVisibleToHandler(bool useInterpreter)
+        public void FilterOverwriteExceptionVisibleToHandler(bool useInterpreter)
         {
             ParameterExpression exception = Expression.Variable(typeof(TestException));
             TryExpression tryExp = Expression.TryCatch(
@@ -1006,11 +1005,14 @@ namespace System.Linq.Expressions.Tests
                 )
             );
             Expression<Func<int>> lambda = Expression.Lambda<Func<int>>(tryExp);
-#if FEATURE_COMPILE
-            Assert.Throws<InvalidOperationException>(() => lambda.Compile(false));
-#else
-            lambda.Compile(true);
-#endif
+            if (PlatformDetection.IsNotLinqExpressionsBuiltWithIsInterpretingOnly)
+            {
+                Assert.Throws<InvalidOperationException>(() => lambda.Compile(false));
+            }
+            else
+            {
+                lambda.Compile(true);
+            }
         }
 
         [Theory, InlineData(true)]
@@ -1255,7 +1257,7 @@ namespace System.Linq.Expressions.Tests
         }
 
         [Theory, ClassData(typeof(CompilationTypes))]
-        public void JumpOutOfCatch(bool useIntepreter)
+        public void JumpOutOfCatch(bool useInterpreter)
         {
             LabelTarget target = Expression.Label(typeof(int));
             Expression<Func<int>> tryExp = Expression.Lambda<Func<int>>(
@@ -1269,11 +1271,11 @@ namespace System.Linq.Expressions.Tests
                                 Expression.Throw(Expression.Constant(new Exception()))))),
                     Expression.Return(target, Expression.Constant(2)),
                     Expression.Label(target, Expression.Constant(0))));
-            Assert.Equal(1, tryExp.Compile(useIntepreter)());
+            Assert.Equal(1, tryExp.Compile(useInterpreter)());
         }
 
         [Theory, ClassData(typeof(CompilationTypes))]
-        public void JumpOutOfCatchToPreviousLabel(bool useIntepreter)
+        public void JumpOutOfCatchToPreviousLabel(bool useInterpreter)
         {
             LabelTarget skipStart = Expression.Label();
             LabelTarget skipToEnd = Expression.Label(typeof(int));
@@ -1287,7 +1289,7 @@ namespace System.Linq.Expressions.Tests
                         Expression.Catch(typeof(Exception), Expression.Goto(backToStart))),
                     Expression.Return(skipToEnd, Expression.Constant(2)),
                     Expression.Label(skipToEnd, Expression.Constant(0))));
-            Assert.Equal(1, tryExp.Compile(useIntepreter)());
+            Assert.Equal(1, tryExp.Compile(useInterpreter)());
         }
 
         [Fact]
@@ -1401,7 +1403,7 @@ namespace System.Linq.Expressions.Tests
         [Fact]
         public void CatchesMustReturnVoidWithVoidBody()
         {
-            Assert.Throws<ArgumentException>(null, () =>
+            AssertExtensions.Throws<ArgumentException>(null, () =>
                 Expression.TryCatch(
                     Expression.Empty(),
                     Expression.Catch(typeof(InvocationExpression), Expression.Constant("hello")),

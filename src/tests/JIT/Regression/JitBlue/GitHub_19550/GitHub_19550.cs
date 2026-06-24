@@ -1,11 +1,15 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_19550;
+
 using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
 using System.Threading;
+using Xunit;
 
 // Test folding of addressing expressions
 
@@ -119,7 +123,8 @@ public class Program
         return returnVal;
     }
 
-    static int Main()
+    [Fact]
+    public static int TestEntryPoint()
     {
         S s = new S();
         Vector128<float> v = Vector128.Create(1.0F);

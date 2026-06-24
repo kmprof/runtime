@@ -7,24 +7,9 @@ using Xunit;
 
 namespace System.Security.Cryptography.Encryption.TripleDes.Tests
 {
-    [SkipOnMono("Not supported on Browser", TestPlatforms.Browser)]
+    [SkipOnPlatform(TestPlatforms.Browser, "Not supported on Browser")]
     public static class TripleDESContractTests
     {
-
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsWindows7))]
-        public static void Windows7DoesNotSupportCFB64()
-        {
-            using (TripleDES tdes = TripleDESFactory.Create())
-            {
-                tdes.GenerateKey();
-                tdes.Mode = CipherMode.CFB;
-                tdes.FeedbackSize = 64;
-
-                Assert.ThrowsAny<CryptographicException>(() => tdes.CreateDecryptor());
-                Assert.ThrowsAny<CryptographicException>(() => tdes.CreateEncryptor());
-            }
-        }
-
         [Theory]
         [InlineData(0, true)]
         [InlineData(1, true)]
@@ -65,17 +50,11 @@ namespace System.Security.Cryptography.Encryption.TripleDes.Tests
             }
         }
 
-        [ConditionalTheory(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Theory]
         [InlineData(8)]
         [InlineData(64)]
         public static void ValidCFBFeedbackSizes(int feedbackSize)
         {
-            // Windows 7 only supports CFB8.
-            if (feedbackSize != 8 && PlatformDetection.IsWindows7)
-            {
-                return;
-            }
-
             using (TripleDES tdes = TripleDESFactory.Create())
             {
                 tdes.GenerateKey();
@@ -87,6 +66,68 @@ namespace System.Security.Cryptography.Encryption.TripleDes.Tests
                 using var encryptor = tdes.CreateEncryptor();
                 Assert.NotNull(decryptor);
                 Assert.NotNull(encryptor);
+            }
+        }
+
+        [Fact]
+        public static void Cfb8ModeCanDepadCfb64Padding()
+        {
+            using (TripleDES tdes = TripleDESFactory.Create())
+            {
+                // 1, 2, 3, 4, 5 encrypted with CFB8 but padded with block-size padding.
+                byte[] ciphertext = "97F1CE6A6D869A85".HexToByteArray();
+                tdes.Key = "3D1ECCEE6C99B029950ED23688AA229AF85177421609F7BF".HexToByteArray();
+                tdes.IV = new byte[8];
+                tdes.Padding = PaddingMode.PKCS7;
+                tdes.Mode = CipherMode.CFB;
+                tdes.FeedbackSize = 8;
+
+                using ICryptoTransform transform = tdes.CreateDecryptor();
+                byte[] decrypted = transform.TransformFinalBlock(ciphertext, 0, ciphertext.Length);
+                Assert.Equal(new byte[] { 1, 2, 3, 4, 5 }, decrypted);
+            }
+        }
+
+        [Fact]
+        public static void SetKey_SetsKey()
+        {
+            using (TripleDES des = TripleDESFactory.Create())
+            {
+                byte[] key = new byte[des.KeySize / 8];
+                RandomNumberGenerator.Fill(key);
+
+                des.SetKey(key);
+                Assert.Equal(key, des.Key);
+            }
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public static void ReadKeyAfterDispose(bool setProperty)
+        {
+            using (TripleDES des = TripleDESFactory.Create())
+            {
+                byte[] key = new byte[des.KeySize / 8];
+                RandomNumberGenerator.Fill(key);
+
+                if (setProperty)
+                {
+                    des.Key = key;
+                }
+                else
+                {
+                    des.SetKey(key);
+                }
+
+                des.Dispose();
+
+                // Asking for the key after dispose just makes a new key be generated.
+                byte[] key2 = des.Key;
+                Assert.NotEqual(key, key2);
+
+                // The new key won't be all zero:
+                Assert.NotEqual(-1, key2.AsSpan().IndexOfAnyExcept((byte)0));
             }
         }
     }

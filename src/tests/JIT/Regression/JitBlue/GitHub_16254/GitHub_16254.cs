@@ -2,8 +2,9 @@ using System;
 using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using Xunit;
 
-namespace UnsafeTesting
+namespace GitHub_16254
 {
     public class Program
     {
@@ -33,7 +34,8 @@ namespace UnsafeTesting
             }
             return true;
         }
-        static int Main()
+        [Fact]
+        public static int TestEntryPoint()
         {
             if (QuaternionAddTest())
             {

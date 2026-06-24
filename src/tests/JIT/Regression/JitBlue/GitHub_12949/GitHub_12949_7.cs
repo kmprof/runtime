@@ -1,7 +1,11 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_12949_7;
+
 using System;
+using Xunit;
 
 public struct V
 {
@@ -13,12 +17,12 @@ public struct V
     public int Token;
 }
 
-class M
+public class M
 {
     static int F(int x, object a)
     {
         int result = 0;
- 
+
         if (a is V)
         {
             int token = ((V)a).Token;
@@ -42,10 +46,12 @@ class M
         return result;
     }
 
-    public static int Main()
+    [OuterLoop]
+    [Fact]
+    public static int TestEntryPoint()
     {
         // Ensure we get right order of side effects from boxes
-        // now that we are splitting them into multiple statments.
+        // now that we are splitting them into multiple statements.
         V v1 = new V(11);
         int result1 = F(Trouble(ref v1), v1);
         V v2 = new V(11);

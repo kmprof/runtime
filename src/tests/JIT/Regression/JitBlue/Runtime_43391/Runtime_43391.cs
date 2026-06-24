@@ -3,11 +3,16 @@
 
 // Block inlining of small localloc callee if call site is in a loop.
 
-using System;
 
-class Runtime_43391
+namespace Runtime_43391;
+
+using System;
+using Xunit;
+
+public class Runtime_43391
 {
-    static int Main()
+    [Fact]
+    public static int TestEntryPoint()
     {
         int r = 58;
         for (int i = 1; i >= 0; i--)

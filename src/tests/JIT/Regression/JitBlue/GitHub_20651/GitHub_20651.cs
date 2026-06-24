@@ -1,9 +1,13 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-using System;
 
-class X
+namespace GitHub_20651;
+
+using System;
+using Xunit;
+
+public class X
 {
     static string s = "hello, world";
 
@@ -15,7 +19,9 @@ class X
     }
 
     // Ensure GTF_CALL flag is propagated to MD array accessor
-    public static int Main()
+    [OuterLoop]
+    [Fact]
+    public static int TestEntryPoint()
     {
         int c = G()[0,0].GetHashCode();
         int v = s.GetHashCode();

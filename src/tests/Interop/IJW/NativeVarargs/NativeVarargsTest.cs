@@ -8,15 +8,18 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using Xunit;
 using TestLibrary;
 
 namespace NativeVarargsTest
 {
-    class NativeVarargsTest
+    public class NativeVarargsTest
     {
-        static int Main(string[] args)
+        [ActiveIssue("C++/CLI, IJW not supported on Mono", TestRuntimes.Mono)]
+        [Fact]
+        public static int TestEntryPoint()
         {
-            if(Environment.OSVersion.Platform != PlatformID.Win32NT || TestLibrary.Utilities.IsWindows7 || TestLibrary.Utilities.IsWindowsNanoServer)
+            if(Environment.OSVersion.Platform != PlatformID.Win32NT || TestLibrary.Utilities.IsWindowsNanoServer)
             {
                 return 100;
             }
@@ -26,7 +29,7 @@ namespace NativeVarargsTest
 
             try
             {
-                Assembly ijwNativeDll = IjwHelper.LoadIjwAssembly("IjwNativeVarargs");
+                Assembly ijwNativeDll = Assembly.Load("IjwNativeVarargs");
                 Type testType = ijwNativeDll.GetType("TestClass");
                 object testInstance = Activator.CreateInstance(testType);
                 MethodInfo testMethod = testType.GetMethod("RunTests");

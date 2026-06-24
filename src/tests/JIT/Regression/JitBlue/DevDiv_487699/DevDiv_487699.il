@@ -2,12 +2,14 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 .assembly extern mscorlib {}
-.assembly a {}
-.module a.exe
+.assembly 'DevDiv_487699' {}
+.assembly extern Microsoft.DotNet.XUnitExtensions { .publickeytoken = (31 BF 38 56 AD 36 4E 35 ) }
+.assembly extern TestLibrary { .ver 0:0:0:0 }
+.assembly extern xunit.core {}
 
 // This test originally triggered an error, that we do not reload shift index, if it was spilled to rcx.
 
-.class ILGEN_CLASS
+.class public ILGEN_CLASS
 {
    .method static native int ILGEN_METHOD(unsigned int8, int64, native int, unsigned int16)
    {
@@ -105,8 +107,16 @@
         IL_00fb: ret   
     }
     
-      .method private static int32 Main()
+      .method public static int32 Main()
     {
+        .custom instance void [xunit.core]Xunit.FactAttribute::.ctor() = (
+            01 00 00 00
+        )
+        .custom instance void [Microsoft.DotNet.XUnitExtensions]Xunit.ActiveIssueAttribute::.ctor(string, class [mscorlib]System.Type, string[]) = {
+            string('needs triage')
+            type([TestLibrary]TestLibrary.PlatformDetection)
+            string[2] ('IsMonoRuntime' 'IsArm64Process')
+        }
         .entrypoint
         .maxstack  10
                 

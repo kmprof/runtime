@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <CLRTestKind>BuildAndRun</CLRTestKind>
+    <!-- Needed for UnloadabilityIncompatible -->
+    <RequiresProcessIsolation>true</RequiresProcessIsolation>
     <!-- The test uses AssemblyLoadContext (directly) to load the test assembly and its dependency that's part of the test again.
     When the test is loaded into an unloadable context in the runincontext tool, the dependency assembly cannot be found
     since it is in a different folder than the runincontext tool.  -->
@@ -10,6 +10,6 @@
   <ItemGroup>
     <Compile Include="$(MSBuildProjectName).cs" />
     <ProjectReference Include="ContextualReflectionDependency.csproj" />
-    <ProjectReference Include="$(TestSourceDir)Common/CoreCLRTestLibrary/CoreCLRTestLibrary.csproj" />
+    <ProjectReference Include="$(TestLibraryProjectPath)" />
   </ItemGroup>
 </Project>

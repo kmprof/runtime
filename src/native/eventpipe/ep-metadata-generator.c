@@ -1,7 +1,6 @@
-#include <config.h>
+#include "ep-rt-config.h"
 
 #ifdef ENABLE_PERFTRACING
-#include "ep-rt-config.h"
 #if !defined(EP_INCLUDE_SOURCE_FILES) || defined(EP_FORCE_INCLUDE_SOURCE_FILES)
 
 #define EP_IMPL_METADATA_GENERATOR_GETTER_SETTER
@@ -177,6 +176,7 @@ metadata_generator_write_uint32_to_buffer (
 	uint32_t value)
 {
 	EP_ASSERT ((*offset + sizeof (value)) <= buffer_len);
+	value = ep_rt_val_uint32_t (value);
 	memcpy (buffer + *offset, &value, sizeof (value));
 	*offset += sizeof (value);
 }
@@ -190,6 +190,7 @@ metadata_generator_write_int64_to_buffer (
 	int64_t value)
 {
 	EP_ASSERT ((*offset + sizeof (value)) <= buffer_len);
+	value = ep_rt_val_int64_t (value);
 	memcpy (buffer + *offset, &value, sizeof (value));
 	*offset += sizeof (value);
 }
@@ -366,7 +367,7 @@ ep_parameter_desc_fini (EventPipeParameterDesc *parameter_desc)
 #endif /* !defined(EP_INCLUDE_SOURCE_FILES) || defined(EP_FORCE_INCLUDE_SOURCE_FILES) */
 #endif /* ENABLE_PERFTRACING */
 
-#ifndef EP_INCLUDE_SOURCE_FILES
+#if !defined(ENABLE_PERFTRACING) || (defined(EP_INCLUDE_SOURCE_FILES) && !defined(EP_FORCE_INCLUDE_SOURCE_FILES))
 extern const char quiet_linker_empty_file_warning_eventpipe_metadata_generator;
 const char quiet_linker_empty_file_warning_eventpipe_metadata_generator = 0;
 #endif

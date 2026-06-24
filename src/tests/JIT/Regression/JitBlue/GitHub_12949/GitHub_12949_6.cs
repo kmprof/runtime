@@ -1,8 +1,12 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_12949_6;
+
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 
 public interface IGet 
 {
@@ -44,9 +48,11 @@ public class X<K> where K: IGet
     K[] a;
 }
 
-class B
+public class B
 {
-    public static int Main()
+    [OuterLoop]
+    [Fact]
+    public static int TestEntryPoint()
     {
         var r = new R();
         r.a = 3;

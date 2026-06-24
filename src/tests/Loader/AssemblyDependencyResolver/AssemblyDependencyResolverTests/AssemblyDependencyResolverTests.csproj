@@ -1,9 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <CLRTestKind>BuildAndRun</CLRTestKind>
-    <CLRTestPriority>0</CLRTestPriority>
+    <!-- Needed for NativeAotIncompatible -->
+    <RequiresProcessIsolation>true</RequiresProcessIsolation>
     <RequiresMockHostPolicy>true</RequiresMockHostPolicy>
+    <!-- AssemblyDependencyResolver is not supported -->
+    <NativeAotIncompatible>true</NativeAotIncompatible>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="AssemblyDependencyResolverTests.cs" />
@@ -11,6 +12,6 @@
     <Compile Include="TestBase.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="$(TestSourceDir)Common/CoreCLRTestLibrary/CoreCLRTestLibrary.csproj" />
+    <ProjectReference Include="$(TestLibraryProjectPath)" />
   </ItemGroup>
 </Project>

@@ -1,8 +1,12 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_18867;
+
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 
 interface IRT
 {
@@ -22,7 +26,8 @@ public class Program
     static int s_3;
     static short[] s_8 = new short[] { -1 };
 
-    public static int Main()
+    [Fact]
+    public static int TestEntryPoint()
     {
         s_rt = new CRT();
         M11(s_8, 0, 0, 0, true, s_1);

@@ -2,21 +2,27 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 //
 
-using System;
 
-public class Test
+namespace devdiv_174983;
+
+using System;
+using Xunit;
+
+public class Test_devdiv_174983
 {
     public int i;
     public int j;
 
     public static int l;
 
-    public static int Main()
+    [OuterLoop]
+    [Fact]
+    public static int TestEntryPoint()
     {
-        Test test = new Test();
+        Test_devdiv_174983 test = new Test_devdiv_174983();
         test.i = 3;
         test.j = 5;
-        Test.l = 1;
+        Test_devdiv_174983.l = 1;
         if (test.Foo() == 8)
         {
             Console.WriteLine("PASS!");

@@ -1,14 +1,18 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_8599;
+
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 
 // TreeNodeInfoInitCmp attempts to eliminate the cast from cmp(cast<ubyte>(x), icon)
 // by narrowing the compare to ubyte. This should only happen if the constant fits in
 // a byte so it can be narrowed too, otherwise codegen produces an int sized compare.
 
-class Program
+public class Program
 {
     [MethodImpl(MethodImplOptions.NoInlining)]
     static int GetValue() => 301;
@@ -17,7 +21,9 @@ class Program
     {
     }
 
-    static int Main()
+    [OuterLoop]
+    [Fact]
+    public static int TestEntryPoint()
     {
         if ((byte)GetValue() > 300)
         {

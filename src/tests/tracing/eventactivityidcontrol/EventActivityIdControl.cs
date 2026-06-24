@@ -6,9 +6,14 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Tracing.Tests.Common;
+using Xunit;
+using TestLibrary;
 
 namespace Tracing.Tests
 {
+    using Xunit;
+    using Assert = Tracing.Tests.Common.Assert;
+    
     public static class EventActivityIdControlTest
     {
         internal enum ActivityControlCode : uint
@@ -26,7 +31,10 @@ namespace Tracing.Tests
         private static MethodInfo s_EventActivityIdControl;
         private static bool s_FailureEncountered = false;
 
-        static int Main(string[] args)
+        [ActiveIssue("needs triage", typeof(PlatformDetection), nameof(PlatformDetection.IsMonoLLVMAOT))]
+        [ActiveIssue("needs triage", TestPlatforms.Browser | TestPlatforms.iOS | TestPlatforms.tvOS | TestPlatforms.MacCatalyst)]
+        [Fact]
+        public static int TestEntryPoint()
         {
             if(!Initialize())
             {

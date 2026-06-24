@@ -1,5 +1,6 @@
 parameters:
   name: ''
+  isOfficialBuild: true
 
 steps:
 - task: CopyFiles@2
@@ -12,9 +13,11 @@ steps:
     TargetFolder: '$(Build.StagingDirectory)/IntermediateArtifacts/${{ parameters.name }}'
     CleanTargetFolder: true
 
-- task: PublishBuildArtifacts@1
-  displayName: Publish intermediate artifacts
-  inputs:
-    pathToPublish: '$(Build.StagingDirectory)/IntermediateArtifacts'
-    artifactName: IntermediateArtifacts
-    artifactType: container
+- template: /eng/pipelines/common/templates/publish-build-artifacts.yml
+  parameters:
+    isOfficialBuild: ${{ parameters.isOfficialBuild }}
+    displayName: Publish intermediate artifacts
+    inputs:
+      PathtoPublish: '$(Build.StagingDirectory)/IntermediateArtifacts'
+      ArtifactName: IntermediateArtifacts
+      ArtifactType: container

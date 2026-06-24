@@ -1,8 +1,12 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_7907;
+
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 
 #pragma warning disable 472
 
@@ -42,7 +46,9 @@ public class Bug7907
         return count;
     }
 
-    public static int Main(string[] args)
+    [OuterLoop]
+    [Fact]
+    public static int TestEntryPoint()
     {
         int result0 = new Bug7907().F0(10);
         int result1 = new Bug7907().F1(10);

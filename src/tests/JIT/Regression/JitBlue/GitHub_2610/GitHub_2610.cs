@@ -1,8 +1,12 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_2610;
+
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 
 public struct MyValue
 {
@@ -20,9 +24,11 @@ public struct MyStruct
     { v1 = a; v2 = b; }
 }
 
-class Program
+public class Program
 {
-    static int Main()
+    [OuterLoop]
+    [Fact]
+    public static int TestEntryPoint()
     {
         MyValue p1 = new MyValue(10);
         MyValue p2 = new MyValue(20);

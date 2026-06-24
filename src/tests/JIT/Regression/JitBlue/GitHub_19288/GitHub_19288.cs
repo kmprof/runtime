@@ -4,9 +4,13 @@
 // This test exhibits a case where the JIT was passing a 3-byte struct
 // by loading 4-bytes, which is not always safe.
 
+
+namespace GitHub_19288;
+
 using System;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
+using Xunit;
 
 public class GitHub_19288
 {
@@ -42,7 +46,8 @@ public class GitHub_19288
             return 0;
         }
 
-        static int Main()
+        [Fact]
+        public static int TestEntryPoint()
         {
             try
             {

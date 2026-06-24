@@ -35,9 +35,9 @@ function Find-Os()
     {
         switch -Wildcard ($(uname -s))
         {
-            "Linux*" { return "Linux" }
-            "Darwin*" { return "MacOS" }
-            "*" { return "Unix" }
+            "Linux*" { return "linux" }
+            "Darwin*" { return "osx" }
+            "*" { return "unix" }
         }
     }
 }
@@ -142,7 +142,6 @@ function Set-Sdk-Environment()
     $env:DOTNET_ROOT=$candidate_path
     $env:DOTNET_CLI_HOME=$candidate_path
     $env:PATH=($candidate_path + $pathSeparator + $env:PATH)
-    $env:DOTNET_MULTILEVEL_LOOKUP=0
     $env:DOTNET_ROLL_FORWARD_ON_NO_CANDIDATE_FX=2
 }
 

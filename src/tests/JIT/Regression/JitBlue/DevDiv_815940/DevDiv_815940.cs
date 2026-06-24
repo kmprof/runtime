@@ -2,14 +2,20 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 //
 
-using System;
 
-class Repro
+namespace DevDiv_815940_ro;
+
+using System;
+using Xunit;
+
+public class Repro
 {
     static char c1 = (char)32768;
     static char c2 = (char)0;
 
-    static int Main()
+    [OuterLoop]
+    [Fact]
+    public static int TestEntryPoint()
     {
         //This testcase ensures that we correctly generate character comparisons
 

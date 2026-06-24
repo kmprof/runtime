@@ -4,17 +4,22 @@
 
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
+using TestLibrary;
 
 // The jit should null check 'this' in NextElement
 
-unsafe struct GitHub_23791
+public unsafe struct GitHub_23791
 {
     fixed byte A[10];
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     byte NextElement(int i) => A[1+i];
 
-    static int Main() 
+    [Fact]
+    [ActiveIssue("https://github.com/dotnet/runtime/issues/114908", typeof(PlatformDetection), nameof(PlatformDetection.IsAppleMobile))]
+    [ActiveIssue("https://github.com/dotnet/runtime/issues/34385", TestRuntimes.Mono)]
+    public static int TestEntryPoint() 
     {
         int result = -1;
         GitHub_23791* x = null;

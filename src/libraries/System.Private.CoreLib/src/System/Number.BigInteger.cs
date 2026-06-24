@@ -3,15 +3,15 @@
 
 using System.Diagnostics;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using Internal.Runtime.CompilerServices;
 
 namespace System
 {
     internal static partial class Number
     {
         [StructLayout(LayoutKind.Sequential, Pack = 1)]
-        internal unsafe ref struct BigInteger
+        internal ref struct BigInteger
         {
             // The longest binary mantissa requires: explicit mantissa bits + abs(min exponent)
             // * Half:     10 +    14 =    24
@@ -31,10 +31,12 @@ namespace System
             private const int MaxBits = BitsForLongestBinaryMantissa + BitsForLongestDigitSequence + BitsPerBlock;
 
             private const int BitsPerBlock = sizeof(int) * 8;
-            private const int MaxBlockCount = (MaxBits + (BitsPerBlock - 1)) / BitsPerBlock;
 
-            private static readonly uint[] s_Pow10UInt32Table = new uint[]
-            {
+            // We need one extra block to make our shift left algorithm significantly simpler
+            private const int MaxBlockCount = ((MaxBits + (BitsPerBlock - 1)) / BitsPerBlock) + 1;
+
+            private static ReadOnlySpan<uint> Pow10UInt32Table =>
+            [
                 1,          // 10^0
                 10,         // 10^1
                 100,        // 10^2
@@ -46,10 +48,10 @@ namespace System
                 // These last two are accessed only by MultiplyPow10.
                 100000000,  // 10^8
                 1000000000  // 10^9
-            };
+            ];
 
-            private static readonly int[] s_Pow10BigNumTableIndices = new int[]
-            {
+            private static ReadOnlySpan<int> Pow10BigNumTableIndices =>
+            [
                 0,          // 10^8
                 2,          // 10^16
                 5,          // 10^32
@@ -58,10 +60,10 @@ namespace System
                 33,         // 10^256
                 61,         // 10^512
                 116,        // 10^1024
-            };
+            ];
 
-            private static readonly uint[] s_Pow10BigNumTable = new uint[]
-            {
+            private static ReadOnlySpan<uint> Pow10BigNumTable =>
+            [
                 // 10^8
                 1,          // _length
                 100000000,  // _blocks
@@ -302,7 +304,7 @@ namespace System
                 0xD9D61A05,
                 0x00000325,
 
-                // 9 Trailing blocks to ensure MaxBlockCount
+                // 10 Trailing blocks to ensure MaxBlockCount
                 0x00000000,
                 0x00000000,
                 0x00000000,
@@ -312,13 +314,16 @@ namespace System
                 0x00000000,
                 0x00000000,
                 0x00000000,
-            };
+                0x00000000,
+            ];
 
             private int _length;
-            private fixed uint _blocks[MaxBlockCount];
+            private BlocksBuffer _blocks;
 
-            public static void Add(ref BigInteger lhs, ref BigInteger rhs, out BigInteger result)
+            public static void Add(scoped ref BigInteger lhs, scoped ref BigInteger rhs, out BigInteger result)
             {
+                Unsafe.SkipInit(out result);
+
                 // determine which operand has the smaller length
                 ref BigInteger large = ref (lhs._length < rhs._length) ? ref rhs : ref lhs;
                 ref BigInteger small = ref (lhs._length < rhs._length) ? ref lhs : ref rhs;
@@ -340,7 +345,7 @@ namespace System
                 {
                     ulong sum = carry + large._blocks[largeIndex] + small._blocks[smallIndex];
                     carry = sum >> 32;
-                    result._blocks[resultIndex] = (uint)(sum);
+                    result._blocks[resultIndex] = (uint)sum;
 
                     largeIndex++;
                     smallIndex++;
@@ -352,32 +357,45 @@ namespace System
                 {
                     ulong sum = carry + large._blocks[largeIndex];
                     carry = sum >> 32;
-                    result._blocks[resultIndex] = (uint)(sum);
+                    result._blocks[resultIndex] = (uint)sum;
 
                     largeIndex++;
                     resultIndex++;
                 }
 
+                int resultLength = largeLength;
+
                 // If there's still a carry, append a new block
                 if (carry != 0)
                 {
                     Debug.Assert(carry == 1);
-                    Debug.Assert((resultIndex == largeLength) && (largeLength < MaxBlockCount));
+                    Debug.Assert(resultIndex == resultLength);
+                    Debug.Assert(unchecked((uint)resultLength) < MaxBlockCount);
+
+                    if (unchecked((uint)resultLength) >= MaxBlockCount)
+                    {
+                        // We shouldn't reach here, and the above assert will help flag this
+                        // during testing, but we'll ensure that we return a safe value of
+                        // zero in the case we end up overflowing in any way.
+
+                        SetZero(out result);
+                        return;
+                    }
 
                     result._blocks[resultIndex] = 1;
                     result._length++;
                 }
             }
 
-            public static int Compare(ref BigInteger lhs, ref BigInteger rhs)
+            public static int Compare(scoped ref BigInteger lhs, scoped ref BigInteger rhs)
             {
-                Debug.Assert(unchecked((uint)(lhs._length)) <= MaxBlockCount);
-                Debug.Assert(unchecked((uint)(rhs._length)) <= MaxBlockCount);
+                Debug.Assert(unchecked((uint)lhs._length) <= MaxBlockCount);
+                Debug.Assert(unchecked((uint)rhs._length) <= MaxBlockCount);
 
                 int lhsLength = lhs._length;
                 int rhsLength = rhs._length;
 
-                int lengthDelta = (lhsLength - rhsLength);
+                int lengthDelta = lhsLength - rhsLength;
 
                 if (lengthDelta != 0)
                 {
@@ -390,9 +408,9 @@ namespace System
                     return 0;
                 }
 
-                for (int index = (lhsLength - 1); index >= 0; index--)
+                for (int index = lhsLength - 1; index >= 0; index--)
                 {
-                    long delta = (long)(lhs._blocks[index]) - rhs._blocks[index];
+                    long delta = (long)lhs._blocks[index] - rhs._blocks[index];
 
                     if (delta != 0)
                     {
@@ -403,17 +421,17 @@ namespace System
                 return 0;
             }
 
-            public static uint CountSignificantBits(uint value)
+            public static int CountSignificantBits(uint value)
             {
-                return 32 - (uint)BitOperations.LeadingZeroCount(value);
+                return 32 - BitOperations.LeadingZeroCount(value);
             }
 
-            public static uint CountSignificantBits(ulong value)
+            public static int CountSignificantBits(ulong value)
             {
-                return 64 - (uint)BitOperations.LeadingZeroCount(value);
+                return 64 - BitOperations.LeadingZeroCount(value);
             }
 
-            public static uint CountSignificantBits(ref BigInteger value)
+            public static int CountSignificantBits(ref BigInteger value)
             {
                 if (value.IsZero())
                 {
@@ -423,14 +441,16 @@ namespace System
                 // We don't track any unused blocks, so we only need to do a BSR on the
                 // last index and add that to the number of bits we skipped.
 
-                uint lastIndex = (uint)(value._length - 1);
+                int lastIndex = value._length - 1;
                 return (lastIndex * BitsPerBlock) + CountSignificantBits(value._blocks[lastIndex]);
             }
 
-            public static void DivRem(ref BigInteger lhs, ref BigInteger rhs, out BigInteger quo, out BigInteger rem)
+            public static void DivRem(scoped ref BigInteger lhs, scoped ref BigInteger rhs, out BigInteger quo, out BigInteger rem)
             {
+                Unsafe.SkipInit(out quo);
+
                 // This is modified from the libraries BigIntegerCalculator.DivRem.cs implementation:
-                // https://github.com/dotnet/runtime/blob/master/src/libraries/System.Runtime.Numerics/src/System/Numerics/BigIntegerCalculator.DivRem.cs
+                // https://github.com/dotnet/runtime/blob/main/src/libraries/System.Runtime.Numerics/src/System/Numerics/BigIntegerCalculator.DivRem.cs
 
                 Debug.Assert(!rhs.IsZero());
 
@@ -446,7 +466,7 @@ namespace System
 
                 if ((lhsLength == 1) && (rhsLength == 1))
                 {
-                    uint quotient = Math.DivRem(lhs._blocks[0], rhs._blocks[0], out uint remainder);
+                    (uint quotient, uint remainder) = Math.DivRem(lhs._blocks[0], rhs._blocks[0]);
                     SetUInt32(out quo, quotient);
                     SetUInt32(out rem, remainder);
                     return;
@@ -464,7 +484,8 @@ namespace System
                     for (int i = quoLength - 1; i >= 0; i--)
                     {
                         ulong value = (carry << 32) | lhs._blocks[i];
-                        ulong digit = Math.DivRem(value, rhsValue, out carry);
+                        ulong digit;
+                        (digit, carry) = Math.DivRem(value, rhsValue);
 
                         if ((digit == 0) && (i == (quoLength - 1)))
                         {
@@ -472,12 +493,12 @@ namespace System
                         }
                         else
                         {
-                            quo._blocks[i] = (uint)(digit);
+                            quo._blocks[i] = (uint)digit;
                         }
                     }
 
                     quo._length = quoLength;
-                    SetUInt32(out rem, (uint)(carry));
+                    SetUInt32(out rem, (uint)carry);
 
                     return;
                 }
@@ -514,7 +535,7 @@ namespace System
 
                         if (rhsLength > 2)
                         {
-                            divLo |= (rhs._blocks[rhsLength - 3] >> shiftRight);
+                            divLo |= rhs._blocks[rhsLength - 3] >> shiftRight;
                         }
                     }
 
@@ -525,7 +546,7 @@ namespace System
                         int n = i - rhsLength;
                         uint t = i < lhsLength ? rem._blocks[i] : 0;
 
-                        ulong valHi = ((ulong)(t) << 32) | rem._blocks[i - 1];
+                        ulong valHi = ((ulong)t << 32) | rem._blocks[i - 1];
                         uint valLo = i > 1 ? rem._blocks[i - 2] : 0;
 
                         // We shifted the divisor, we shift the dividend too
@@ -536,7 +557,7 @@ namespace System
 
                             if (i > 2)
                             {
-                                valLo |= (rem._blocks[i - 3] >> shiftRight);
+                                valLo |= rem._blocks[i - 3] >> shiftRight;
                             }
                         }
 
@@ -557,6 +578,11 @@ namespace System
 
                         if (digit > 0)
                         {
+                            // rem and rhs have different lifetimes here and compiler is warning
+                            // about potential for one to copy into the other. This is a place
+                            // ref scoped parameters would alleviate.
+                            // https://github.com/dotnet/roslyn/issues/64393
+#pragma warning disable CS9080
                             // Now it's time to subtract our current quotient
                             uint carry = SubtractDivisor(ref rem, n, ref rhs, digit);
 
@@ -570,6 +596,7 @@ namespace System
 
                                 Debug.Assert(carry == 1);
                             }
+#pragma warning restore CS9080
                         }
 
                         // We have the digit!
@@ -581,7 +608,7 @@ namespace System
                             }
                             else
                             {
-                                quo._blocks[n] = (uint)(digit);
+                                quo._blocks[n] = (uint)digit;
                             }
                         }
 
@@ -601,6 +628,11 @@ namespace System
                         {
                             remLength--;
                         }
+                        else
+                        {
+                            // As soon as we find a non-zero block, the rest of remainder is significant
+                            break;
+                        }
                     }
 
                     rem._length = remLength;
@@ -619,7 +651,7 @@ namespace System
                 // This is an estimated quotient. Its error should be less than 2.
                 // Reference inequality:
                 // a/b - floor(floor(a)/(floor(b) + 1)) < 2
-                int lastIndex = (divisorLength - 1);
+                int lastIndex = divisorLength - 1;
                 uint quotient = dividend._blocks[lastIndex] / (divisor._blocks[lastIndex] + 1);
 
                 if (quotient != 0)
@@ -633,13 +665,13 @@ namespace System
 
                     do
                     {
-                        ulong product = ((ulong)(divisor._blocks[index]) * quotient) + carry;
+                        ulong product = ((ulong)divisor._blocks[index] * quotient) + carry;
                         carry = product >> 32;
 
-                        ulong difference = (ulong)(dividend._blocks[index]) - (uint)(product) - borrow;
+                        ulong difference = (ulong)dividend._blocks[index] - (uint)product - borrow;
                         borrow = (difference >> 32) & 1;
 
-                        dividend._blocks[index] = (uint)(difference);
+                        dividend._blocks[index] = (uint)difference;
 
                         index++;
                     }
@@ -666,10 +698,10 @@ namespace System
 
                     do
                     {
-                        ulong difference = (ulong)(dividend._blocks[index]) - divisor._blocks[index] - borrow;
+                        ulong difference = (ulong)dividend._blocks[index] - divisor._blocks[index] - borrow;
                         borrow = (difference >> 32) & 1;
 
-                        dividend._blocks[index] = (uint)(difference);
+                        dividend._blocks[index] = (uint)difference;
 
                         index++;
                     }
@@ -687,8 +719,10 @@ namespace System
                 return quotient;
             }
 
-            public static void Multiply(ref BigInteger lhs, uint value, out BigInteger result)
+            public static void Multiply(scoped ref BigInteger lhs, uint value, out BigInteger result)
             {
+                Unsafe.SkipInit(out result);
+
                 if (lhs._length <= 1)
                 {
                     SetUInt64(out result, (ulong)lhs.ToUInt32() * value);
@@ -714,27 +748,40 @@ namespace System
 
                 while (index < lhsLength)
                 {
-                    ulong product = ((ulong)(lhs._blocks[index]) * value) + carry;
-                    result._blocks[index] = (uint)(product);
+                    ulong product = ((ulong)lhs._blocks[index] * value) + carry;
+                    result._blocks[index] = (uint)product;
                     carry = (uint)(product >> 32);
 
                     index++;
                 }
 
+                int resultLength = lhsLength;
+
                 if (carry != 0)
                 {
-                    Debug.Assert(unchecked((uint)(lhsLength)) + 1 <= MaxBlockCount);
+                    Debug.Assert(unchecked((uint)resultLength) < MaxBlockCount);
+
+                    if (unchecked((uint)resultLength) >= MaxBlockCount)
+                    {
+                        // We shouldn't reach here, and the above assert will help flag this
+                        // during testing, but we'll ensure that we return a safe value of
+                        // zero in the case we end up overflowing in any way.
+
+                        SetZero(out result);
+                        return;
+                    }
+
                     result._blocks[index] = carry;
-                    result._length = (lhsLength + 1);
+                    resultLength += 1;
                 }
-                else
-                {
-                    result._length = lhsLength;
-                }
+
+                result._length = resultLength;
             }
 
-            public static void Multiply(ref BigInteger lhs, ref BigInteger rhs, out BigInteger result)
+            public static void Multiply(scoped ref BigInteger lhs, scoped ref BigInteger rhs, out BigInteger result)
             {
+                Unsafe.SkipInit(out result);
+
                 if (lhs._length <= 1)
                 {
                     Multiply(ref rhs, lhs.ToUInt32(), out result);
@@ -763,11 +810,21 @@ namespace System
                 }
 
                 int maxResultLength = smallLength + largeLength;
-                Debug.Assert(unchecked((uint)(maxResultLength)) <= MaxBlockCount);
+                Debug.Assert(unchecked((uint)maxResultLength) <= MaxBlockCount);
+
+                if (unchecked((uint)maxResultLength) > MaxBlockCount)
+                {
+                    // We shouldn't reach here, and the above assert will help flag this
+                    // during testing, but we'll ensure that we return a safe value of
+                    // zero in the case we end up overflowing in any way.
+
+                    SetZero(out result);
+                    return;
+                }
 
                 // Zero out result internal blocks.
                 result._length = maxResultLength;
-                result.Clear((uint)maxResultLength);
+                result.Clear(maxResultLength);
 
                 int smallIndex = 0;
                 int resultStartIndex = 0;
@@ -784,16 +841,16 @@ namespace System
 
                         do
                         {
-                            ulong product = result._blocks[resultIndex] + ((ulong)(small._blocks[smallIndex]) * large._blocks[largeIndex]) + carry;
+                            ulong product = result._blocks[resultIndex] + ((ulong)small._blocks[smallIndex] * large._blocks[largeIndex]) + carry;
                             carry = product >> 32;
-                            result._blocks[resultIndex] = (uint)(product);
+                            result._blocks[resultIndex] = (uint)product;
 
                             resultIndex++;
                             largeIndex++;
                         }
                         while (largeIndex < largeLength);
 
-                        result._blocks[resultIndex] = (uint)(carry);
+                        result._blocks[resultIndex] = (uint)carry;
                     }
 
                     smallIndex++;
@@ -806,58 +863,72 @@ namespace System
                 }
             }
 
-            public static void Pow2(uint exponent, out BigInteger result)
+            public static void Pow2(int exponent, out BigInteger result)
             {
-                uint blocksToShift = DivRem32(exponent, out uint remainingBitsToShift);
-                result._length = (int)blocksToShift + 1;
+                Unsafe.SkipInit(out result);
+
+                int blocksToShift = DivRem32(exponent, out int remainingBitsToShift);
+                result._length = blocksToShift + 1;
+
                 Debug.Assert(unchecked((uint)result._length) <= MaxBlockCount);
+
+                if (unchecked((uint)result._length) > MaxBlockCount)
+                {
+                    // We shouldn't reach here, and the above assert will help flag this
+                    // during testing, but we'll ensure that we return a safe value of
+                    // zero in the case we end up overflowing in any way.
+
+                    SetZero(out result);
+                    return;
+                }
+
                 if (blocksToShift > 0)
                 {
                     result.Clear(blocksToShift);
                 }
-                result._blocks[blocksToShift] = 1U << (int)(remainingBitsToShift);
+                result._blocks[blocksToShift] = 1U << remainingBitsToShift;
             }
 
             public static void Pow10(uint exponent, out BigInteger result)
             {
-                // We leverage two arrays - s_Pow10UInt32Table and s_Pow10BigNumTable to speed up the Pow10 calculation.
+                // We leverage two arrays - Pow10UInt32Table and Pow10BigNumTable to speed up the Pow10 calculation.
                 //
-                // s_Pow10UInt32Table stores the results of 10^0 to 10^7.
-                // s_Pow10BigNumTable stores the results of 10^8, 10^16, 10^32, 10^64, 10^128, 10^256, and 10^512
+                // Pow10UInt32Table stores the results of 10^0 to 10^7.
+                // Pow10BigNumTable stores the results of 10^8, 10^16, 10^32, 10^64, 10^128, 10^256, and 10^512
                 //
                 // For example, let's say exp = 0b111111. We can split the exp to two parts, one is small exp,
                 // which 10^smallExp can be represented as uint, another part is 10^bigExp, which must be represented as BigNum.
                 // So the result should be 10^smallExp * 10^bigExp.
                 //
-                // Calculating 10^smallExp is simple, we just lookup the 10^smallExp from s_Pow10UInt32Table.
+                // Calculating 10^smallExp is simple, we just lookup the 10^smallExp from Pow10UInt32Table.
                 // But here's a bad news: although uint can represent 10^9, exp 9's binary representation is 1001.
                 // That means 10^(1011), 10^(1101), 10^(1111) all cannot be stored as uint, we cannot easily say something like:
-                // "Any bits <= 3 is small exp, any bits > 3 is big exp". So instead of involving 10^8, 10^9 to s_Pow10UInt32Table,
-                // consider 10^8 and 10^9 as a bigNum, so they fall into s_Pow10BigNumTable. Now we can have a simple rule:
+                // "Any bits <= 3 is small exp, any bits > 3 is big exp". So instead of involving 10^8, 10^9 to Pow10UInt32Table,
+                // consider 10^8 and 10^9 as a bigNum, so they fall into Pow10BigNumTable. Now we can have a simple rule:
                 // "Any bits <= 3 is small exp, any bits > 3 is big exp".
                 //
                 // For 0b111111, we first calculate 10^(smallExp), which is 10^(7), now we can shift right 3 bits, prepare to calculate the bigExp part,
                 // the exp now becomes 0b000111.
                 //
-                // Apparently the lowest bit of bigExp should represent 10^8 because we have already shifted 3 bits for smallExp, so s_Pow10BigNumTable[0] = 10^8.
+                // Apparently the lowest bit of bigExp should represent 10^8 because we have already shifted 3 bits for smallExp, so Pow10BigNumTable[0] = 10^8.
                 // Now let's shift exp right 1 bit, the lowest bit should represent 10^(8 * 2) = 10^16, and so on...
                 //
-                // That's why we just need the values of s_Pow10BigNumTable be power of 2.
+                // That's why we just need the values of Pow10BigNumTable be power of 2.
                 //
                 // More details of this implementation can be found at: https://github.com/dotnet/coreclr/pull/12894#discussion_r128890596
 
-                // Validate that `s_Pow10BigNumTable` has exactly enough trailing elements to fill a BigInteger (which contains MaxBlockCount + 1 elements)
+                // Validate that `Pow10BigNumTable` has exactly enough trailing elements to fill a BigInteger (which contains MaxBlockCount + 1 elements)
                 // We validate here, since this is the only current consumer of the array
-                Debug.Assert((s_Pow10BigNumTableIndices[^1] + MaxBlockCount + 2) == s_Pow10BigNumTable.Length);
+                Debug.Assert((Pow10BigNumTableIndices[^1] + MaxBlockCount + 2) == Pow10BigNumTable.Length);
 
-                SetUInt32(out BigInteger temp1, s_Pow10UInt32Table[exponent & 0x7]);
+                SetUInt32(out BigInteger temp1, Pow10UInt32Table[(int)(exponent & 0x7)]);
                 ref BigInteger lhs = ref temp1;
 
                 SetZero(out BigInteger temp2);
                 ref BigInteger product = ref temp2;
 
                 exponent >>= 3;
-                uint index = 0;
+                int index = 0;
 
                 while (exponent != 0)
                 {
@@ -865,9 +936,16 @@ namespace System
                     if ((exponent & 1) != 0)
                     {
                         // Multiply into the next temporary
-                        fixed (uint* pBigNumEntry = &s_Pow10BigNumTable[s_Pow10BigNumTableIndices[index]])
+                        unsafe
                         {
-                            ref BigInteger rhs = ref *(BigInteger*)(pBigNumEntry);
+                            // It is safe to reinterpret the memory at the indexed position of Pow10BigNumTable as a BigInteger,
+                            // because Pow10BigNumTable is laid out such that each indexed position contains a valid BigInteger
+                            // representation with the correct structure and alignment.
+
+                            int pow10BigNumTableIndex = Pow10BigNumTableIndices[index];
+                            Debug.Assert((pow10BigNumTableIndex + ((sizeof(BigInteger) + sizeof(uint) - 1) / sizeof(uint))) < Pow10BigNumTable.Length);
+
+                            ref BigInteger rhs = ref Unsafe.As<uint, BigInteger>(ref Unsafe.AsRef(in Pow10BigNumTable[pow10BigNumTableIndex]));
                             Multiply(ref lhs, ref rhs, out product);
                         }
 
@@ -907,7 +985,7 @@ namespace System
                     carry = digit >> 32;
                 }
 
-                return (uint)(carry);
+                return (uint)carry;
             }
 
             private static bool DivideGuessTooBig(ulong q, ulong valHi, uint valLo, uint divHi, uint divLo)
@@ -922,7 +1000,7 @@ namespace System
                 ulong chkHi = divHi * q;
                 ulong chkLo = divLo * q;
 
-                chkHi += (chkLo >> 32);
+                chkHi += chkLo >> 32;
                 chkLo &= uint.MaxValue;
 
                 if (chkHi < valHi)
@@ -971,7 +1049,7 @@ namespace System
                     lhsValue = unchecked(lhsValue - digit);
                 }
 
-                return (uint)(carry);
+                return (uint)carry;
             }
 
             public void Add(uint value)
@@ -1000,23 +1078,34 @@ namespace System
                     }
                 }
 
-                Debug.Assert(unchecked((uint)(length)) + 1 <= MaxBlockCount);
+                Debug.Assert(unchecked((uint)length) < MaxBlockCount);
+
+                if (unchecked((uint)length) >= MaxBlockCount)
+                {
+                    // We shouldn't reach here, and the above assert will help flag this
+                    // during testing, but we'll ensure that we return a safe value of
+                    // zero in the case we end up overflowing in any way.
+
+                    SetZero(out this);
+                    return;
+                }
+
                 _blocks[length] = 1;
                 _length = length + 1;
             }
 
-            public uint GetBlock(uint index)
+            public readonly uint GetBlock(int index)
             {
-                Debug.Assert(index < _length);
+                Debug.Assert((uint)index < _length);
                 return _blocks[index];
             }
 
-            public int GetLength()
+            public readonly int GetLength()
             {
                 return _length;
             }
 
-            public bool IsZero()
+            public readonly bool IsZero()
             {
                 return _length == 0;
             }
@@ -1026,7 +1115,7 @@ namespace System
                 Multiply(ref this, value, out this);
             }
 
-            public void Multiply(ref BigInteger value)
+            public void Multiply(scoped ref BigInteger value)
             {
                 if (value._length <= 1)
                 {
@@ -1052,19 +1141,30 @@ namespace System
 
                 do
                 {
-                    ulong block = (ulong)(_blocks[index]);
+                    ulong block = _blocks[index];
                     ulong product = (block << 3) + (block << 1) + carry;
                     carry = product >> 32;
-                    _blocks[index] = (uint)(product);
+                    _blocks[index] = (uint)product;
 
                     index++;
                 } while (index < length);
 
                 if (carry != 0)
                 {
-                    Debug.Assert(unchecked((uint)(_length)) + 1 <= MaxBlockCount);
+                    Debug.Assert(unchecked((uint)length) < MaxBlockCount);
+
+                    if (unchecked((uint)length) >= MaxBlockCount)
+                    {
+                        // We shouldn't reach here, and the above assert will help flag this
+                        // during testing, but we'll ensure that we return a safe value of
+                        // zero in the case we end up overflowing in any way.
+
+                        SetZero(out this);
+                        return;
+                    }
+
                     _blocks[index] = (uint)carry;
-                    _length++;
+                    _length = length + 1;
                 }
             }
 
@@ -1072,7 +1172,7 @@ namespace System
             {
                 if (exponent <= 9)
                 {
-                    Multiply(s_Pow10UInt32Table[exponent]);
+                    Multiply(Pow10UInt32Table[(int)exponent]);
                 }
                 else if (!IsZero())
                 {
@@ -1083,6 +1183,8 @@ namespace System
 
             public static void SetUInt32(out BigInteger result, uint value)
             {
+                Unsafe.SkipInit(out result);
+
                 if (value == 0)
                 {
                     SetZero(out result);
@@ -1096,33 +1198,40 @@ namespace System
 
             public static void SetUInt64(out BigInteger result, ulong value)
             {
+                Unsafe.SkipInit(out result);
+
                 if (value <= uint.MaxValue)
                 {
-                    SetUInt32(out result, (uint)(value));
+                    SetUInt32(out result, (uint)value);
                 }
                 else
                 {
-                    result._blocks[0] = (uint)(value);
+                    result._blocks[0] = (uint)value;
                     result._blocks[1] = (uint)(value >> 32);
 
                     result._length = 2;
                 }
             }
 
-            public static void SetValue(out BigInteger result, ref BigInteger value)
+            public static void SetValue(out BigInteger result, scoped ref BigInteger value)
             {
+                Unsafe.SkipInit(out result);
                 int rhsLength = value._length;
+
                 result._length = rhsLength;
                 Buffer.Memmove(ref result._blocks[0], ref value._blocks[0], (nuint)rhsLength);
             }
 
             public static void SetZero(out BigInteger result)
             {
+                Unsafe.SkipInit(out result);
                 result._length = 0;
             }
 
-            public void ShiftLeft(uint shift)
+            public void ShiftLeft(int shift)
             {
+                Debug.Assert(shift >= 0);
+
                 // Process blocks high to low so that we can safely process in place
                 int length = _length;
 
@@ -1131,16 +1240,26 @@ namespace System
                     return;
                 }
 
-                uint blocksToShift = DivRem32(shift, out uint remainingBitsToShift);
+                int blocksToShift = DivRem32(shift, out int remainingBitsToShift);
 
                 // Copy blocks from high to low
-                int readIndex = (length - 1);
-                int writeIndex = readIndex + (int)(blocksToShift);
+                int readIndex = length - 1;
+                int writeIndex = readIndex + blocksToShift;
 
                 // Check if the shift is block aligned
                 if (remainingBitsToShift == 0)
                 {
-                    Debug.Assert(writeIndex < MaxBlockCount);
+                    Debug.Assert(unchecked((uint)length) < MaxBlockCount);
+
+                    if (unchecked((uint)length) >= MaxBlockCount)
+                    {
+                        // We shouldn't reach here, and the above assert will help flag this
+                        // during testing, but we'll ensure that we return a safe value of
+                        // zero in the case we end up overflowing in any way.
+
+                        SetZero(out this);
+                        return;
+                    }
 
                     while (readIndex >= 0)
                     {
@@ -1149,7 +1268,7 @@ namespace System
                         writeIndex--;
                     }
 
-                    _length += (int)(blocksToShift);
+                    _length += blocksToShift;
 
                     // Zero the remaining low blocks
                     Clear(blocksToShift);
@@ -1157,32 +1276,45 @@ namespace System
                 else
                 {
                     // We need an extra block for the partial shift
+
                     writeIndex++;
-                    Debug.Assert(writeIndex < MaxBlockCount);
+                    Debug.Assert(unchecked((uint)length) < MaxBlockCount);
+
+                    if (unchecked((uint)length) >= MaxBlockCount)
+                    {
+                        // We shouldn't reach here, and the above assert will help flag this
+                        // during testing, but we'll ensure that we return a safe value of
+                        // zero in the case we end up overflowing in any way.
+
+                        SetZero(out this);
+                        return;
+                    }
 
                     // Set the length to hold the shifted blocks
                     _length = writeIndex + 1;
 
                     // Output the initial blocks
-                    uint lowBitsShift = (32 - remainingBitsToShift);
+                    int lowBitsShift = 32 - remainingBitsToShift;
+
                     uint highBits = 0;
                     uint block = _blocks[readIndex];
-                    uint lowBits = block >> (int)(lowBitsShift);
+                    uint lowBits = block >> lowBitsShift;
+
                     while (readIndex > 0)
                     {
                         _blocks[writeIndex] = highBits | lowBits;
-                        highBits = block << (int)(remainingBitsToShift);
+                        highBits = block << remainingBitsToShift;
 
                         --readIndex;
                         --writeIndex;
 
                         block = _blocks[readIndex];
-                        lowBits = block >> (int)lowBitsShift;
+                        lowBits = block >> lowBitsShift;
                     }
 
                     // Output the final blocks
                     _blocks[writeIndex] = highBits | lowBits;
-                    _blocks[writeIndex - 1] = block << (int)(remainingBitsToShift);
+                    _blocks[writeIndex - 1] = block << remainingBitsToShift;
 
                     // Zero the remaining low blocks
                     Clear(blocksToShift);
@@ -1195,7 +1327,7 @@ namespace System
                 }
             }
 
-            public uint ToUInt32()
+            public readonly uint ToUInt32()
             {
                 if (_length > 0)
                 {
@@ -1205,11 +1337,11 @@ namespace System
                 return 0;
             }
 
-            public ulong ToUInt64()
+            public readonly ulong ToUInt64()
             {
                 if (_length > 1)
                 {
-                    return ((ulong)(_blocks[1]) << 32) + _blocks[0];
+                    return ((ulong)_blocks[1] << 32) + _blocks[0];
                 }
 
                 if (_length > 0)
@@ -1220,15 +1352,19 @@ namespace System
                 return 0;
             }
 
-            private void Clear(uint length) =>
-                Buffer.ZeroMemory(
-                    (byte*)Unsafe.AsPointer(ref _blocks[0]), // This is safe to do since we are a ref struct
-                    length * sizeof(uint));
+            private void Clear(int length) => ((Span<uint>)_blocks).Slice(0, length).Clear();
 
-            private static uint DivRem32(uint value, out uint remainder)
+            private static int DivRem32(int value, out int remainder)
             {
+                Debug.Assert(value >= 0);
                 remainder = value & 31;
-                return value >> 5;
+                return value >>> 5;
+            }
+
+            [InlineArray(MaxBlockCount)]
+            private struct BlocksBuffer
+            {
+                public uint e0;
             }
         }
     }

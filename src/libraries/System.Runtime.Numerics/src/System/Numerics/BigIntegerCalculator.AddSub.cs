@@ -2,275 +2,230 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.Diagnostics;
-using System.Security;
+using System.Runtime.CompilerServices;
 
 namespace System.Numerics
 {
     internal static partial class BigIntegerCalculator
     {
-        public static uint[] Add(uint[] left, uint right)
+        /// <summary>
+        /// Specifies the minimum number of elements required to trigger a copy operation using an optimized path.
+        /// </summary>
+        /// <remarks>
+        /// This threshold is determined based on benchmarking and may be adjusted in the future to balance the overhead of copying versus the benefits of reduced loop iterations.
+        /// </remarks>
+        private const int CopyToThreshold = 8;
+
+        private static void CopyTail(ReadOnlySpan<nuint> source, Span<nuint> dest, int start)
         {
-            Debug.Assert(left != null);
-            Debug.Assert(left.Length >= 1);
-
-            // Executes the addition for one big and one 32-bit integer.
-            // Thus, we've similar code than below, but there is no loop for
-            // processing the 32-bit integer, since it's a single element.
-
-            uint[] bits = new uint[left.Length + 1];
-
-            long digit = (long)left[0] + right;
-            bits[0] = unchecked((uint)digit);
-            long carry = digit >> 32;
-
-            for (int i = 1; i < left.Length; i++)
-            {
-                digit = left[i] + carry;
-                bits[i] = unchecked((uint)digit);
-                carry = digit >> 32;
-            }
-            bits[left.Length] = (uint)carry;
-
-            return bits;
+            source.Slice(start).CopyTo(dest.Slice(start));
         }
 
-        public static unsafe uint[] Add(uint[] left, uint[] right)
+        public static void Add(ReadOnlySpan<nuint> left, nuint right, Span<nuint> bits)
         {
-            Debug.Assert(left != null);
-            Debug.Assert(right != null);
+            Debug.Assert(left.Length >= 1);
+            Debug.Assert(bits.Length == left.Length + 1);
+
+            Add(left, bits, startIndex: 0, initialCarry: right);
+        }
+
+        public static void Add(ReadOnlySpan<nuint> left, ReadOnlySpan<nuint> right, Span<nuint> bits)
+        {
+            Debug.Assert(right.Length >= 1);
+            Debug.Assert(left.Length >= right.Length);
+            Debug.Assert(bits.Length == left.Length + 1);
+
+            // Establish cross-span length relationships so the JIT can
+            // elide bounds checks for left[i] and bits[i] in the loop.
+            _ = left[right.Length - 1];
+            _ = bits[right.Length];
+
+            nuint carry = 0;
+
+            for (int i = 0; i < right.Length; i++)
+            {
+                bits[i] = AddWithCarry(left[i], right[i], carry, out carry);
+            }
+
+            Add(left, bits, startIndex: right.Length, initialCarry: carry);
+        }
+
+        public static void AddSelf(Span<nuint> left, ReadOnlySpan<nuint> right)
+        {
             Debug.Assert(left.Length >= right.Length);
 
-            // Switching to unsafe pointers helps sparing
-            // some nasty index calculations...
-
-            uint[] bits = new uint[left.Length + 1];
-
-            fixed (uint* l = left, r = right, b = &bits[0])
-            {
-                Add(l, left.Length,
-                    r, right.Length,
-                    b, bits.Length);
-            }
-
-            return bits;
-        }
-
-        private static unsafe void Add(uint* left, int leftLength,
-                                       uint* right, int rightLength,
-                                       uint* bits, int bitsLength)
-        {
-            Debug.Assert(leftLength >= 0);
-            Debug.Assert(rightLength >= 0);
-            Debug.Assert(leftLength >= rightLength);
-            Debug.Assert(bitsLength == leftLength + 1);
-
-            // Executes the "grammar-school" algorithm for computing z = a + b.
-            // While calculating z_i = a_i + b_i we take care of overflow:
-            // Since a_i + b_i + c <= 2(2^32 - 1) + 1 = 2^33 - 1, our carry c
-            // has always the value 1 or 0; hence, we're safe here.
-
             int i = 0;
-            long carry = 0L;
+            nuint carry = 0;
 
-            for (; i < rightLength; i++)
+            if (right.Length != 0)
             {
-                long digit = (left[i] + carry) + right[i];
-                bits[i] = unchecked((uint)digit);
-                carry = digit >> 32;
+                _ = left[right.Length - 1];
             }
-            for (; i < leftLength; i++)
+
+            for (; i < right.Length; i++)
             {
-                long digit = left[i] + carry;
-                bits[i] = unchecked((uint)digit);
-                carry = digit >> 32;
+                left[i] = AddWithCarry(left[i], right[i], carry, out carry);
             }
-            bits[i] = (uint)carry;
-        }
 
-        private static unsafe void AddSelf(uint* left, int leftLength,
-                                           uint* right, int rightLength)
-        {
-            Debug.Assert(leftLength >= 0);
-            Debug.Assert(rightLength >= 0);
-            Debug.Assert(leftLength >= rightLength);
-
-            // Executes the "grammar-school" algorithm for computing z = a + b.
-            // Same as above, but we're writing the result directly to a and
-            // stop execution, if we're out of b and c is already 0.
-
-            int i = 0;
-            long carry = 0L;
-
-            for (; i < rightLength; i++)
+            for (; carry != 0 && i < left.Length; i++)
             {
-                long digit = (left[i] + carry) + right[i];
-                left[i] = unchecked((uint)digit);
-                carry = digit >> 32;
-            }
-            for (; carry != 0 && i < leftLength; i++)
-            {
-                long digit = left[i] + carry;
-                left[i] = (uint)digit;
-                carry = digit >> 32;
+                nuint sum = left[i] + carry;
+                carry = (sum < carry) ? 1 : (nuint)0;
+                left[i] = sum;
             }
 
             Debug.Assert(carry == 0);
         }
 
-        public static uint[] Subtract(uint[] left, uint right)
+        public static void Subtract(ReadOnlySpan<nuint> left, nuint right, Span<nuint> bits)
         {
-            Debug.Assert(left != null);
             Debug.Assert(left.Length >= 1);
             Debug.Assert(left[0] >= right || left.Length >= 2);
+            Debug.Assert(bits.Length == left.Length);
 
-            // Executes the subtraction for one big and one 32-bit integer.
-            // Thus, we've similar code than below, but there is no loop for
-            // processing the 32-bit integer, since it's a single element.
-
-            uint[] bits = new uint[left.Length];
-
-            long digit = (long)left[0] - right;
-            bits[0] = unchecked((uint)digit);
-            long carry = digit >> 32;
-
-            for (int i = 1; i < left.Length; i++)
-            {
-                digit = left[i] + carry;
-                bits[i] = unchecked((uint)digit);
-                carry = digit >> 32;
-            }
-
-            return bits;
+            Subtract(left, bits, startIndex: 0, initialBorrow: right);
         }
 
-        public static unsafe uint[] Subtract(uint[] left, uint[] right)
+        public static void Subtract(ReadOnlySpan<nuint> left, ReadOnlySpan<nuint> right, Span<nuint> bits)
         {
-            Debug.Assert(left != null);
-            Debug.Assert(right != null);
+            Debug.Assert(right.Length >= 1);
             Debug.Assert(left.Length >= right.Length);
-            Debug.Assert(Compare(left, right) >= 0);
+            Debug.Assert(CompareActual(left, right) >= 0);
+            Debug.Assert(bits.Length == left.Length);
 
-            // Switching to unsafe pointers helps sparing
-            // some nasty index calculations...
+            _ = left[right.Length - 1];
+            _ = bits[right.Length - 1];
 
-            uint[] bits = new uint[left.Length];
+            nuint borrow = 0;
 
-            fixed (uint* l = left, r = right, b = bits)
+            for (int i = 0; i < right.Length; i++)
             {
-                Subtract(l, left.Length,
-                         r, right.Length,
-                         b, bits.Length);
+                bits[i] = SubWithBorrow(left[i], right[i], borrow, out borrow);
             }
 
-            return bits;
+            Subtract(left, bits, startIndex: right.Length, initialBorrow: borrow);
         }
 
-        private static unsafe void Subtract(uint* left, int leftLength,
-                                            uint* right, int rightLength,
-                                            uint* bits, int bitsLength)
+        public static void SubtractSelf(Span<nuint> left, ReadOnlySpan<nuint> right)
         {
-            Debug.Assert(leftLength >= 0);
-            Debug.Assert(rightLength >= 0);
-            Debug.Assert(leftLength >= rightLength);
-            Debug.Assert(Compare(left, leftLength, right, rightLength) >= 0);
-            Debug.Assert(bitsLength == leftLength);
-
-            // Executes the "grammar-school" algorithm for computing z = a - b.
-            // While calculating z_i = a_i - b_i we take care of overflow:
-            // Since a_i - b_i doesn't need any additional bit, our carry c
-            // has always the value -1 or 0; hence, we're safe here.
+            Debug.Assert(left.Length >= right.Length);
 
             int i = 0;
-            long carry = 0L;
+            nuint borrow = 0;
 
-            for (; i < rightLength; i++)
+            if (right.Length != 0)
             {
-                long digit = (left[i] + carry) - right[i];
-                bits[i] = unchecked((uint)digit);
-                carry = digit >> 32;
-            }
-            for (; i < leftLength; i++)
-            {
-                long digit = left[i] + carry;
-                bits[i] = (uint)digit;
-                carry = digit >> 32;
+                _ = left[right.Length - 1];
             }
 
-            Debug.Assert(carry == 0);
+            for (; i < right.Length; i++)
+            {
+                left[i] = SubWithBorrow(left[i], right[i], borrow, out borrow);
+            }
+
+            for (; borrow != 0 && i < left.Length; i++)
+            {
+                nuint val = left[i];
+                left[i] = val - borrow;
+                borrow = val == 0 ? 1 : (nuint)0;
+            }
+
+            Debug.Assert(borrow == 0);
         }
 
-        private static unsafe void SubtractSelf(uint* left, int leftLength,
-                                                uint* right, int rightLength)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void Add(ReadOnlySpan<nuint> left, Span<nuint> bits, int startIndex, nuint initialCarry)
         {
-            Debug.Assert(leftLength >= 0);
-            Debug.Assert(rightLength >= 0);
-            Debug.Assert(leftLength >= rightLength);
-            Debug.Assert(Compare(left, leftLength, right, rightLength) >= 0);
+            // Executes the addition for one big and one single-limb integer.
 
-            // Executes the "grammar-school" algorithm for computing z = a - b.
-            // Same as above, but we're writing the result directly to a and
-            // stop execution, if we're out of b and c is already 0.
+            int i = startIndex;
+            nuint carry = initialCarry;
 
-            int i = 0;
-            long carry = 0L;
+            _ = bits[left.Length];
 
-            for (; i < rightLength; i++)
+            if (left.Length <= CopyToThreshold)
             {
-                long digit = (left[i] + carry) - right[i];
-                left[i] = unchecked((uint)digit);
-                carry = digit >> 32;
-            }
-            for (; carry != 0 && i < leftLength; i++)
-            {
-                long digit = left[i] + carry;
-                left[i] = (uint)digit;
-                carry = digit >> 32;
-            }
+                for (; i < left.Length; i++)
+                {
+                    nuint sum = left[i] + carry;
+                    carry = (sum < carry) ? 1 : (nuint)0;
+                    bits[i] = sum;
+                }
 
-            Debug.Assert(carry == 0);
+                bits[left.Length] = carry;
+            }
+            else
+            {
+                for (; i < left.Length;)
+                {
+                    nuint sum = left[i] + carry;
+                    carry = (sum < carry) ? 1 : (nuint)0;
+                    bits[i] = sum;
+                    i++;
+
+                    // Once carry is set to 0 it can not be 1 anymore.
+                    // So the tail of the loop is just the movement of argument values to result span.
+                    if (carry == 0)
+                    {
+                        break;
+                    }
+                }
+
+                bits[left.Length] = carry;
+
+                if (i < left.Length)
+                {
+                    CopyTail(left, bits, i);
+                }
+            }
         }
 
-        public static int Compare(uint[] left, uint[] right)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void Subtract(ReadOnlySpan<nuint> left, Span<nuint> bits, int startIndex, nuint initialBorrow)
         {
-            Debug.Assert(left != null);
-            Debug.Assert(right != null);
+            // Executes the subtraction for one big and one single-limb integer.
 
-            if (left.Length < right.Length)
-                return -1;
-            if (left.Length > right.Length)
-                return 1;
+            int i = startIndex;
+            nuint borrow = initialBorrow;
 
-            for (int i = left.Length - 1; i >= 0; i--)
+            if (left.Length != 0)
             {
-                if (left[i] < right[i])
-                    return -1;
-                if (left[i] > right[i])
-                    return 1;
+                _ = bits[left.Length - 1];
             }
 
-            return 0;
-        }
-
-        private static unsafe int Compare(uint* left, int leftLength,
-                                          uint* right, int rightLength)
-        {
-            Debug.Assert(leftLength >= 0);
-            Debug.Assert(rightLength >= 0);
-
-            if (leftLength < rightLength)
-                return -1;
-            if (leftLength > rightLength)
-                return 1;
-
-            for (int i = leftLength - 1; i >= 0; i--)
+            if (left.Length <= CopyToThreshold)
             {
-                if (left[i] < right[i])
-                    return -1;
-                if (left[i] > right[i])
-                    return 1;
+                for (; i < left.Length; i++)
+                {
+                    nuint val = left[i];
+                    nuint diff = val - borrow;
+                    borrow = (diff > val) ? 1 : (nuint)0;
+                    bits[i] = diff;
+                }
             }
+            else
+            {
+                for (; i < left.Length;)
+                {
+                    nuint val = left[i];
+                    nuint diff = val - borrow;
+                    borrow = (diff > val) ? 1 : (nuint)0;
+                    bits[i] = diff;
+                    i++;
 
-            return 0;
+                    // Once borrow is set to 0 it can not be 1 anymore.
+                    // So the tail of the loop is just the movement of argument values to result span.
+                    if (borrow == 0)
+                    {
+                        break;
+                    }
+                }
+
+                if (i < left.Length)
+                {
+                    CopyTail(left, bits, i);
+                }
+            }
         }
     }
 }

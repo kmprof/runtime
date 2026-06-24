@@ -38,7 +38,7 @@ wasm_throw_corlib_exception (void)
 }
 
 gboolean
-mono_arch_unwind_frame (MonoDomain *domain, MonoJitTlsData *jit_tls, 
+mono_arch_unwind_frame (MonoJitTlsData *jit_tls,
 						MonoJitInfo *ji, MonoContext *ctx,
 						MonoContext *new_ctx, MonoLMF **lmf,
 						host_mgreg_t **save_locations,
@@ -53,7 +53,7 @@ mono_arch_unwind_frame (MonoDomain *domain, MonoJitTlsData *jit_tls,
 
 	/*
 	 * Can't unwind native frames on WASM, so we only process the ones
-	 * which push an LMF frame. See the needs_stack_walk code in
+	 * which push an LMF frame. See the needs_LMF code in
 	 * method-to-ir.c.
 	 */
 	if (*lmf) {
@@ -67,7 +67,7 @@ mono_arch_unwind_frame (MonoDomain *domain, MonoJitTlsData *jit_tls,
 		gpointer addr = mono_compile_method_checked ((*lmf)->method, error);
 		mono_error_assert_ok (error);
 
-		ji = mini_jit_info_table_find (domain, addr, NULL);
+		ji = mini_jit_info_table_find (addr);
 		g_assert (ji);
 
 		frame->type = FRAME_TYPE_MANAGED;
@@ -96,7 +96,7 @@ mono_arch_get_restore_context (MonoTrampInfo **info, gboolean aot)
 		*info = mono_tramp_info_create ("restore_context", (guint8*)wasm_restore_context, 1, NULL, NULL);
 	return (gpointer)wasm_restore_context;
 }
-gpointer 
+gpointer
 mono_arch_get_throw_corlib_exception (MonoTrampInfo **info, gboolean aot)
 {
 	if (info)

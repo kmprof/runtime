@@ -4,12 +4,15 @@
 using System;
 using System.Reflection;
 using System.Reflection.Emit;
+using TestLibrary;
+using Xunit;
 
 namespace GitHub_25020
 {
-    class Program
+    public class Program
     {    
-        static int Main(string[] args)
+        [ConditionalFact(typeof(Utilities), nameof(Utilities.IsReflectionEmitSupported))]
+        public static void TestEntryPoint()
         {
             DynamicMethod dm = new DynamicMethod("MyMethod", typeof(string), new Type[] { typeof(string), typeof(string) });
             
@@ -24,8 +27,6 @@ namespace GitHub_25020
             string b = "abcd";
             
             Console.WriteLine(dm.Invoke(null, BindingFlags.Default, null, new object[] {a, b}, null));
-
-            return 100;
         }
     }
 }

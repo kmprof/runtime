@@ -1,14 +1,12 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-#if USE_MDT_EVENTSOURCE
-using Microsoft.Diagnostics.Tracing;
-#else
-using System.Diagnostics.Tracing;
-#endif
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.Tracing;
 using System.Threading;
+using Xunit;
+using TestLibrary;
 
 namespace BasicEventSourceTests
 {
@@ -150,7 +148,10 @@ namespace BasicEventSourceTests
             return successCountCalled;
         }
 
-        public static int Main(string[] args)
+        [ActiveIssue(" needs triage ", typeof(PlatformDetection), nameof(PlatformDetection.IsMonoAnyAOT))]
+        [ActiveIssue("System.Threading.Thread.UnsafeStart not supported", TestPlatforms.Browser)]
+        [Fact]
+        public static int TestEntryPoint()
         {
             // Create an EventListener.
             using (SimpleEventListener myListener = new SimpleEventListener("SimpleEventSource", EventLevel.Verbose))

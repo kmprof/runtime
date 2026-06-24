@@ -1,7 +1,8 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-.assembly extern System.Runtime {}
+.assembly extern System.Runtime { .publickeytoken = (B0 3F 5F 7F 11 D5 0A 3A ) }
+.assembly extern xunit.core {}
 .assembly testchangesimpofvirtslot {}
 
 .class private auto ansi beforefieldinit A
@@ -87,10 +88,13 @@
     }
 }
 
-.class private auto ansi beforefieldinit Program
+.class public auto ansi beforefieldinit Program
 {
-    .method private hidebysig static int32 Main (string[] args) cil managed
+    .method public hidebysig static int32 Main () cil managed
     {
+        .custom instance void [xunit.core]Xunit.FactAttribute::.ctor() = (
+            01 00 00 00
+        )
         .entrypoint
 
         newobj instance void C::.ctor()

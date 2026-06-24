@@ -17,7 +17,6 @@
 #include <conio.h>
 #include <assert.h>
 
-#include <mono/metadata/coree.h>
 #include <mono/metadata/assembly.h>
 #include <mono/metadata/loader.h>
 #include <mono/metadata/tabledefs.h>
@@ -35,15 +34,14 @@
 #include <mono/metadata/gc-internals.h>
 #include <mono/metadata/threads-types.h>
 #include <mono/metadata/verify.h>
-#include <mono/metadata/verify-internals.h>
 #include <mono/metadata/mempool-internals.h>
-#include <mono/metadata/attach.h>
 #include <mono/utils/mono-math.h>
 #include <mono/utils/mono-compiler.h>
 #include <mono/utils/mono-counters.h>
 #include <mono/utils/mono-logger-internals.h>
 #include <mono/utils/mono-mmap.h>
 #include <mono/utils/dtrace.h>
+#include <mono/utils/mono-context.h>
 #include <mono/utils/w32subset.h>
 
 #include "mini.h"
@@ -56,10 +54,9 @@
 #include "jit-icalls.h"
 
 #define MONO_HANDLER_DELIMITER ','
-#define MONO_HANDLER_DELIMITER_LEN G_N_ELEMENTS(MONO_HANDLER_DELIMITER)-1
 
 #define MONO_HANDLER_ATEXIT_WAIT_KEYPRESS "atexit-waitkeypress"
-#define MONO_HANDLER_ATEXIT_WAIT_KEYPRESS_LEN G_N_ELEMENTS(MONO_HANDLER_ATEXIT_WAIT_KEYPRESS)-1
+#define MONO_HANDLER_ATEXIT_WAIT_KEYPRESS_LEN STRING_LENGTH(MONO_HANDLER_ATEXIT_WAIT_KEYPRESS)
 
 // Typedefs used to setup handler table.
 typedef void (*handler)(void);
@@ -235,21 +232,7 @@ mono_runtime_install_custom_handlers_usage (void)
 }
 
 void
-mono_runtime_cleanup_handlers (void)
-{
-#ifndef MONO_CROSS_COMPILE
-	win32_seh_cleanup();
-#endif
-}
-
-void
 mono_init_native_crash_info (void)
-{
-	return;
-}
-
-void
-mono_cleanup_native_crash_info (void)
 {
 	return;
 }
@@ -266,6 +249,12 @@ MONO_SIG_HANDLER_SIGNATURE (mono_chain_signal)
 	/* Set to FALSE to indicate that vectored exception handling should continue to look for handler */
 	MONO_SIG_HANDLER_GET_INFO ()->handled = FALSE;
 	return TRUE;
+}
+
+void
+mono_chain_signal_to_default_sigsegv_handler (void)
+{
+	g_error ("mono_chain_signal_to_default_sigsegv_handler not supported on Windows");
 }
 
 #if !HAVE_EXTERN_DEFINED_NATIVE_CRASH_HANDLER
@@ -299,7 +288,9 @@ thread_timer_expired (HANDLE thread)
 	if (GetThreadContext (thread, &context)) {
 		guchar *ip;
 
-#ifdef _WIN64
+#ifdef _ARM64_
+		ip = (guchar *) context.Pc;
+#elif _WIN64
 		ip = (guchar *) context.Rip;
 #else
 		ip = (guchar *) context.Eip;
@@ -313,22 +304,6 @@ static VOID CALLBACK
 timer_event_proc (UINT uID, UINT uMsg, DWORD_PTR dwUser, DWORD_PTR dw1, DWORD_PTR dw2)
 {
 	thread_timer_expired ((HANDLE)dwUser);
-}
-
-static VOID
-stop_profiler_timer_event (void)
-{
-	if (g_timer_event != 0) {
-
-		timeKillEvent (g_timer_event);
-		g_timer_event = 0;
-	}
-
-	if (g_timer_main_thread != INVALID_HANDLE_VALUE) {
-
-		CloseHandle (g_timer_main_thread);
-		g_timer_main_thread = INVALID_HANDLE_VALUE;
-	}
 }
 
 static VOID
@@ -361,24 +336,9 @@ mono_runtime_setup_stat_profiler (void)
 	start_profiler_timer_event ();
 	return;
 }
-
-void
-mono_runtime_shutdown_stat_profiler (void)
-{
-	stop_profiler_timer_event ();
-	return;
-}
 #elif !HAVE_EXTERN_DEFINED_WIN32_TIMERS
 void
 mono_runtime_setup_stat_profiler (void)
-{
-	g_unsupported_api ("timeGetDevCaps, timeBeginPeriod, timeEndPeriod, timeSetEvent, timeKillEvent");
-	SetLastError (ERROR_NOT_SUPPORTED);
-	return;
-}
-
-void
-mono_runtime_shutdown_stat_profiler (void)
 {
 	g_unsupported_api ("timeGetDevCaps, timeBeginPeriod, timeEndPeriod, timeSetEvent, timeKillEvent");
 	SetLastError (ERROR_NOT_SUPPORTED);
@@ -391,22 +351,31 @@ gboolean
 mono_setup_thread_context(DWORD thread_id, MonoContext *mono_context)
 {
 	HANDLE handle;
-	CONTEXT context;
+#if defined(MONO_HAVE_SIMD_REG_AVX) && HAVE_API_SUPPORT_WIN32_CONTEXT_XSTATE
+	BYTE context_buffer [2048];
+	DWORD context_buffer_len = G_N_ELEMENTS (context_buffer);
+	PCONTEXT context = NULL;
+	BOOL success = InitializeContext (context_buffer, CONTEXT_INTEGER | CONTEXT_FLOATING_POINT | CONTEXT_CONTROL | CONTEXT_XSTATE, &context, &context_buffer_len);
+	success &= SetXStateFeaturesMask (context, XSTATE_MASK_AVX);
+	g_assert (success == TRUE);
+#else
+	CONTEXT context_buffer;
+	PCONTEXT context = &context_buffer;
+	context->ContextFlags = CONTEXT_INTEGER | CONTEXT_FLOATING_POINT | CONTEXT_CONTROL;
+#endif
 
 	g_assert (thread_id != GetCurrentThreadId ());
 
 	handle = OpenThread (THREAD_ALL_ACCESS, FALSE, thread_id);
 	g_assert (handle);
 
-	context.ContextFlags = CONTEXT_INTEGER | CONTEXT_FLOATING_POINT | CONTEXT_CONTROL;
-
-	if (!GetThreadContext (handle, &context)) {
+	if (!GetThreadContext (handle, context)) {
 		CloseHandle (handle);
 		return FALSE;
 	}
 
 	memset (mono_context, 0, sizeof (MonoContext));
-	mono_sigctx_to_monoctx (&context, mono_context);
+	mono_sigctx_to_monoctx (context, mono_context);
 
 	CloseHandle (handle);
 	return TRUE;
@@ -433,8 +402,18 @@ mono_thread_state_init_from_handle (MonoThreadUnwindState *tctx, MonoThreadInfo 
 		DWORD id = mono_thread_info_get_tid (info);
 		mono_setup_thread_context (id, &tctx->ctx);
 	} else {
+#ifdef ENABLE_CHECKED_BUILD
 		g_assert (((CONTEXT *)sigctx)->ContextFlags & CONTEXT_INTEGER);
 		g_assert (((CONTEXT *)sigctx)->ContextFlags & CONTEXT_CONTROL);
+		g_assert (((CONTEXT *)sigctx)->ContextFlags & CONTEXT_FLOATING_POINT);
+#if defined(MONO_HAVE_SIMD_REG_AVX) && HAVE_API_SUPPORT_WIN32_CONTEXT_XSTATE
+		DWORD64 features = 0;
+		g_assert (((CONTEXT *)sigctx)->ContextFlags & CONTEXT_XSTATE);
+		g_assert (GetXStateFeaturesMask (((CONTEXT *)sigctx), &features) == TRUE);
+		g_assert ((features & XSTATE_MASK_LEGACY_SSE) != 0);
+		g_assert ((features & XSTATE_MASK_AVX) != 0);
+#endif
+#endif
 		mono_sigctx_to_monoctx (sigctx, &tctx->ctx);
 	}
 
@@ -481,8 +460,6 @@ mono_win32_runtime_tls_callback (HMODULE module_handle, DWORD reason, LPVOID res
 		mono_install_runtime_load (mini_init);
 		break;
 	case DLL_PROCESS_DETACH:
-		if (coree_module_handle)
-			FreeLibrary (coree_module_handle);
 		break;
 	case DLL_THREAD_DETACH:
 		mono_thread_info_detach ();

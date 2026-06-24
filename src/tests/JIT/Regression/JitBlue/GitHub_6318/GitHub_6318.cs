@@ -2,12 +2,14 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 using System.Runtime.CompilerServices;
 using System.Numerics;
+using Xunit;
 
-namespace N
+namespace GitHub_6318
 {
     public static class C
     {
-        public static int Main(string[] args)
+        [Fact]
+        public static int TestEntryPoint()
         {
             // Regression test for an issue with assertion prop leading
             // to the wrong exception being thrown from Vector<T>.CopyTo

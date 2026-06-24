@@ -1,8 +1,12 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_27027;
+
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 
 public struct S
 {
@@ -10,11 +14,13 @@ public struct S
     public int j;
 }
 
-public class Test
+public class Test_GitHub_27027
 {
     public S s;
 
-    public static int Main()
+    [OuterLoop]
+    [Fact]
+    public static int TestEntryPoint()
     {
         // Test that the correct exception is thrown from Run.
         // The bug was that the exceptions were reordered and DivideByZeroException
@@ -31,7 +37,7 @@ public class Test
     }
  
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static int Run(Test test, int j)
+    public static int Run(Test_GitHub_27027 test, int j)
     {
         int k = test.s.i + 1/j;
         return k;

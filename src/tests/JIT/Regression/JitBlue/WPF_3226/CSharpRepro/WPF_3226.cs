@@ -1,9 +1,13 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace WPF_3226;
+
 using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Xunit;
 
 [StructLayout(LayoutKind.Sequential)]
 class POINT 
@@ -20,7 +24,7 @@ class MINMAXINFO
     public POINT ptMaxTrackSize = new POINT();
 }
 
-class Test
+public class Test_WPF_3226
 {
     static void WmGetMinMaxInfo(IntPtr lParam)
     {
@@ -34,7 +38,9 @@ class Test
         Marshal.StructureToPtr(mmi, lParam, true);
     }
 
-    public unsafe static int Main()
+    [ActiveIssue("https://github.com/dotnet/runtime/issues/129508", TestRuntimes.Mono)]
+    [Fact]
+    public unsafe static int TestEntryPoint()
     {
         MINMAXINFO mmi = new MINMAXINFO();
         IntPtr pmmi = Marshal.AllocHGlobal(Marshal.SizeOf(mmi));

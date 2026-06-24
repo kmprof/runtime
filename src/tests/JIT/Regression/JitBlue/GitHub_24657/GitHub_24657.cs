@@ -1,8 +1,12 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_24657;
+
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 
 public class GitHub_24657
 {
@@ -28,7 +32,8 @@ public class GitHub_24657
         }
     }
 
-    public static int Main(string[] args)
+    [Fact]
+    public static int TestEntryPoint()
     {
         int returnVal = 100;
         var array = new [] { new TestStruct(123), new TestStruct(456) };

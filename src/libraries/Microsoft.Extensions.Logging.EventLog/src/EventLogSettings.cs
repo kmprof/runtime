@@ -2,8 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
-using System.Diagnostics;
-using System.Runtime.InteropServices;
 
 namespace Microsoft.Extensions.Logging.EventLog
 {
@@ -12,37 +10,35 @@ namespace Microsoft.Extensions.Logging.EventLog
     /// </summary>
     public class EventLogSettings
     {
-        private IEventLog _eventLog;
+        /// <summary>
+        /// Gets or sets the name of the event log. If <see langword="null" /> or not specified, "Application" is the default.
+        /// </summary>
+        public string? LogName { get; set; }
 
         /// <summary>
-        /// Name of the event log. If <c>null</c> or not specified, "Application" is the default.
+        /// Gets or sets the name of the event log source. If <see langword="null" /> or not specified, ".NET Runtime" is the default.
         /// </summary>
-        public string LogName { get; set; }
+        public string? SourceName { get; set; }
 
         /// <summary>
-        /// Name of the event log source. If <c>null</c> or not specified, ".NET Runtime" is the default.
+        /// Gets or sets the name of the machine with the event log. If <see langword="null" /> or not specified, local machine is the default.
         /// </summary>
-        public string SourceName { get; set; }
+        public string? MachineName { get; set; }
 
         /// <summary>
-        /// Name of the machine having the event log. If <c>null</c> or not specified, local machine is the default.
+        /// Gets or sets the function used to filter events based on the log level.
         /// </summary>
-        public string MachineName { get; set; }
-
-        /// <summary>
-        /// The function used to filter events based on the log level.
-        /// </summary>
-        public Func<string, LogLevel, bool> Filter { get; set; }
+        public Func<string, LogLevel, bool>? Filter { get; set; }
 
         internal IEventLog EventLog
         {
-            get => _eventLog ??= CreateDefaultEventLog();
+            get => field ??= CreateDefaultEventLog();
 
             // For unit testing purposes only.
-            set => _eventLog = value;
+            set => field = value;
         }
 
-        private IEventLog CreateDefaultEventLog()
+        private WindowsEventLog CreateDefaultEventLog()
         {
             string logName = string.IsNullOrEmpty(LogName) ? "Application" : LogName;
             string machineName = string.IsNullOrEmpty(MachineName) ? "." : MachineName;
@@ -55,9 +51,6 @@ namespace Microsoft.Extensions.Logging.EventLog
                 defaultEventId = 1000;
             }
 
-#if NETSTANDARD
-            Debug.Assert(RuntimeInformation.IsOSPlatform(OSPlatform.Windows));
-#endif
             return new WindowsEventLog(logName, machineName, sourceName) { DefaultEventId = defaultEventId };
         }
     }

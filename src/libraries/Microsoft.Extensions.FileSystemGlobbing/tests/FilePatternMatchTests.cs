@@ -1,6 +1,7 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using System;
 using Xunit;
 
 namespace Microsoft.Extensions.FileSystemGlobbing.Tests
@@ -26,16 +27,15 @@ namespace Microsoft.Extensions.FileSystemGlobbing.Tests
         }
 
         [Fact]
-        public void TestGetHashCodeWithNull()
+        public void TestPathArgumentNullExceptions()
         {
-            FilePatternMatch match = new FilePatternMatch(null, null);
-            Assert.Equal(0, match.GetHashCode());
+            Assert.Throws<ArgumentNullException>(() => new FilePatternMatch(null, "sub2/bar/baz/three.txt"));
+        }
 
-            int hash1 = new FilePatternMatch("non null", null).GetHashCode();
-            int hash2 = new FilePatternMatch(null, "non null").GetHashCode();
-            Assert.NotEqual(0, hash1);
-            Assert.NotEqual(0, hash2);
-            Assert.NotEqual(hash1, hash2);
+        [Fact]
+        public void TestStemArgumentNullExceptions()
+        {
+            Assert.Throws<ArgumentNullException>(() => new FilePatternMatch("sub2/bar/baz/three.txt", null));
         }
     }
 }

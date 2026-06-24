@@ -1,14 +1,18 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace Runtime_40440;
+
 using System;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Diagnostics;
 using System.Runtime.Intrinsics;
 using System.Security.Cryptography;
+using Xunit;
 
-class Runtime_40440
+public class Runtime_40440
 {
     [MethodImpl(MethodImplOptions.NoInlining)]
     static bool UseArrayElementAsCallArgument<T>(T[,,] a, T b)
@@ -152,7 +156,8 @@ class Runtime_40440
         return UseArrayElementAsCallArgument(v, e);
     }
 
-    public static int Main()
+    [Fact]
+    public static int TestEntryPoint()
     {
         bool f = true;
         f &= CheckVectorFloat();

@@ -7,12 +7,14 @@
 // Same test cases as in GitHub_15077, but without the extra
 // and masking done by CSC.
 .assembly extern System.Console { auto }
-.assembly extern System.Runtime { auto }
+.assembly extern System.Runtime { .publickeytoken = (B0 3F 5F 7F 11 D5 0A 3A ) }
 .assembly extern mscorlib { auto }
 
-.assembly GitHub_15219 {}
+.assembly 'GitHub_15291' {}
+.assembly extern xunit.core {}
+.assembly extern Microsoft.DotNet.XUnitExtensions { .publickeytoken = (31 BF 38 56 AD 36 4E 35 ) }
 
-.class private auto ansi beforefieldinit P
+.class public auto ansi beforefieldinit P
        extends [mscorlib]System.Object
 {
   .method public hidebysig static uint32
@@ -101,6 +103,13 @@
 
   .method public hidebysig static int32  Main() cil managed
   {
+    .custom instance void [xunit.core]Xunit.FactAttribute::.ctor() = (
+        01 00 00 00
+    )
+    .custom instance void [Microsoft.DotNet.XUnitExtensions]Xunit.ActiveIssueAttribute::.ctor(string, valuetype [Microsoft.DotNet.XUnitExtensions]Xunit.TestRuntimes) = {
+        string('Doesn\'t pass after LLVM AOT compilation.')
+        int32(2) // Mono
+    }
     .entrypoint
     .maxstack  3
     .locals init ([0] uint32 r64,

@@ -2,11 +2,17 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 //
 
-using System;
 
-class Repro
+namespace DevDiv_876169_ro;
+
+using System;
+using Xunit;
+
+public class Repro
 {
-    static int Main()
+    [OuterLoop]
+    [Fact]
+    public static void TestEntryPoint()
     {
         //We used to incorrectly generate an infinite loop by
         //emitting a jump instruction to itself
@@ -18,6 +24,5 @@ class Repro
             i++;
         }
         Console.WriteLine("PASS!");
-        return 100;
     }
 }

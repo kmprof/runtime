@@ -4,18 +4,21 @@
 using System;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using Xunit;
+using TestLibrary;
 
 public static class BasicTest
 {
-    private static int Main()
+    [ActiveIssue("No crossgen folder under Core_Root", typeof(Utilities), nameof(Utilities.IsNativeAot))]
+    [ActiveIssue("missing assembly", TestPlatforms.Windows, runtimes: TestRuntimes.Mono)]
+    [ActiveIssue("No crossgen folder under Core_Root", TestPlatforms.Android)]
+    [ActiveIssue("missing assembly", TestPlatforms.iOS | TestPlatforms.tvOS | TestPlatforms.MacCatalyst)]
+    [Fact]
+    public static void TestEntryPoint()
     {
-        const int Pass = 100;
-
         PromoteToTier1(Foo, () => FooWithLoop(2));
         Foo();
         FooWithLoop(2);
-
-        return Pass;
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]

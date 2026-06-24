@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Xunit;
 
 // NOTE: the bug for this test was an assertion in RyuJIT/x86 when generating code for a double-returning call that
 //       was spilled by the RA and subsequently used. The call in question is the call to `C.GetDouble` in `C.Test`.
@@ -8,7 +9,10 @@ using System.Runtime.InteropServices;
 //       return value by the cast. Because the bug is a simple assert, there is no need for the problematic code to
 //       actually run, so the implementation of `GetDouble` does not need to actually exist.
 
-sealed class C
+
+namespace DevDiv_278376;
+
+public sealed class C
 {
     [DllImport("nonexistent.dll")]
     extern static double GetDouble();
@@ -29,7 +33,9 @@ sealed class C
         return 100;
     }
     
-    static int Main(string[] args)
+    [OuterLoop]
+    [Fact]
+    public static int TestEntryPoint()
     {
         return Test(false);
     }

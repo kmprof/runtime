@@ -1,9 +1,13 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace Runtime_31615;
+
 using System;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using Xunit;
 
 // Tests for the contiguous assignments from SIMD to memory
 // optimization in morph
@@ -29,7 +33,7 @@ struct V4
     public float w;
 }
 
-class Runtime_31615
+public class Runtime_31615
 {
     static int s_checks;
     static int s_errors;
@@ -313,7 +317,8 @@ class Runtime_31615
         Check(v4h, g4X, g4Y, g4Z, g4W);
     }
 
-    public static int Main()
+    [Fact]
+    public static int TestEntryPoint()
     {
         Vector2 g2 = G2();
         Vector3 g3 = G3();

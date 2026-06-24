@@ -2,7 +2,11 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 //
 
+
+namespace b610750_32vs64;
+
 using System;
+using Xunit;
 
 public class RandomTwister64
 {
@@ -71,9 +75,11 @@ public class RandomTwister64
 }
 
 
-class Program
+public class Program
 {
-    static int Main(string[] args)
+    [OuterLoop]
+    [Fact]
+    public static int TestEntryPoint()
     {
         int i;
         int countZero = 0;

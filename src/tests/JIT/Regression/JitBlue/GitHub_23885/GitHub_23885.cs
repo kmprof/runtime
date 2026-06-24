@@ -1,9 +1,13 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_23885;
+
 using System;
 using System.Runtime.CompilerServices;
 using System.Numerics;
+using Xunit;
 
 public class GitHub_23885
 {
@@ -38,7 +42,8 @@ public class GitHub_23885
     {
     }
 
-    static int Main(string[] args)
+    [Fact]
+    public static int TestEntryPoint()
     {
         int returnVal = 100;
 

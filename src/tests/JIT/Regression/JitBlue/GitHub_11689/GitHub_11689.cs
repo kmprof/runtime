@@ -5,8 +5,9 @@
 // loops and (illegally) above the corresponding type initializer calls.
 
 using System.Runtime.CompilerServices;
+using Xunit;
 
-namespace N
+namespace GitHub_11689
 {
     struct WrappedInt
     {
@@ -30,7 +31,8 @@ namespace N
             return s;
         }
 
-        public static int Main(string[] args)
+        [Fact]
+        public static int TestEntryPoint()
         {
             return foo(20, 4);
         }

@@ -5,11 +5,15 @@
 // Since the issue was filed, the 'TestStructManuallyInlined' case has apparently
 // gotten worse, as there is a MEMSET of the large struct to 0.
 
+
+namespace GitHub_11816;
+
 using System;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using Xunit;
 
-class GitHub_11816
+public class GitHub_11816
 {
     struct StructType
     {
@@ -116,7 +120,8 @@ class GitHub_11816
         return f[0];
     }
 
-    static int Main()
+    [Fact]
+    public static int TestEntryPoint()
     {
         float value = 0.0F;
         value += TestStruct();

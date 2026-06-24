@@ -1,17 +1,18 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
+using System.Reflection.Emit;
+using System.Text.RegularExpressions;
+
 namespace System.Xml.Serialization
 {
-    using System;
-    using System.Collections;
-    using System.Collections.Generic;
-    using System.Diagnostics.CodeAnalysis;
-    using System.Reflection;
-    using System.Reflection.Emit;
-    using System.Text.RegularExpressions;
-    using System.Xml.Extensions;
-
+    [RequiresUnreferencedCode(XmlSerializer.TrimSerializationWarning)]
+    [RequiresDynamicCode(XmlSerializer.AotSerializationWarning)]
     internal class XmlSerializationILGen
     {
         private int _nextMethodNumber;
@@ -65,20 +66,14 @@ namespace System.Xml.Serialization
         }
         internal TypeAttributes TypeAttributes { get { return _typeAttributes; } }
 
-        private static readonly Dictionary<string, Regex> s_regexs = new Dictionary<string, Regex>();
-        internal static Regex NewRegex(string pattern)
-        {
-            Regex? regex;
-            lock (s_regexs)
-            {
-                if (!s_regexs.TryGetValue(pattern, out regex))
-                {
-                    regex = new Regex(pattern);
-                    s_regexs.Add(pattern, regex);
-                }
-            }
-            return regex;
-        }
+        private static readonly string[] s_typeString = new string[] { "type" };
+        private static readonly string[] s_xmlReaderString = new string[] { "xmlReader" };
+        private static readonly string[] s_objectToSerializeWriterString = new string[] { "objectToSerialize", "writer" };
+        private static readonly string[] s_readerString = new string[] { "reader" };
+        private static readonly Type[] s_typeType = new Type[] { typeof(Type) };
+        private static readonly Type[] s_xmlReaderType = new Type[] { typeof(XmlReader) };
+        private static readonly Type[] s_objectXmlSerializationWriterType = new Type[] { typeof(object), typeof(XmlSerializationWriter) };
+        private static readonly Type[] s_xmlSerializationReaderType = new Type[] { typeof(XmlSerializationReader) };
 
         internal MethodBuilder EnsureMethodBuilder(TypeBuilder typeBuilder, string methodName,
             MethodAttributes attributes, Type? returnType, Type[] parameterTypes)
@@ -132,7 +127,7 @@ namespace System.Xml.Serialization
             return methodName;
         }
 
-        private TypeMapping[] EnsureArrayIndex(TypeMapping[]? a, int index)
+        private static TypeMapping[] EnsureArrayIndex(TypeMapping[]? a, int index)
         {
             if (a == null) return new TypeMapping[32];
             if (index < a.Length) return a;
@@ -141,8 +136,8 @@ namespace System.Xml.Serialization
             return b;
         }
 
-        [return: NotNullIfNotNull("value")]
-        internal string? GetCSharpString(string? value)
+        [return: NotNullIfNotNull(nameof(value))]
+        internal static string? GetCSharpString(string? value)
         {
             return ReflectionAwareILGen.GetCSharpString(value);
         }
@@ -164,7 +159,7 @@ namespace System.Xml.Serialization
 
             ilg.BeginMethod(
                 typeof(Hashtable),
-                "get_" + publicName,
+                $"get_{publicName}",
                 Type.EmptyTypes,
                 Array.Empty<string>(),
                 CodeGenerator.PublicOverrideMethodAttributes | MethodAttributes.SpecialName);
@@ -208,6 +203,7 @@ namespace System.Xml.Serialization
 
             ilg.EndMethod();
         }
+
         internal FieldBuilder GeneratePublicMethods(string privateName, string publicName, string[] methods, XmlMapping[] xmlMappings, TypeBuilder serializerContractTypeBuilder)
         {
             FieldBuilder fieldBuilder = GenerateHashtableGetBegin(privateName, publicName, serializerContractTypeBuilder);
@@ -237,8 +233,8 @@ namespace System.Xml.Serialization
             ilg.BeginMethod(
                 typeof(bool),
                 "CanSerialize",
-                new Type[] { typeof(Type) },
-                new string[] { "type" },
+                s_typeType,
+                s_typeString,
                 CodeGenerator.PublicOverrideMethodAttributes);
             var uniqueTypes = new HashSet<Type>();
             for (int i = 0; i < types.Length; i++)
@@ -307,7 +303,7 @@ namespace System.Xml.Serialization
 
             baseSerializerTypeBuilder.DefineDefaultConstructor(
                 MethodAttributes.Family | MethodAttributes.HideBySig | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName);
-            Type baseSerializerType = baseSerializerTypeBuilder.CreateTypeInfo()!.AsType();
+            Type baseSerializerType = baseSerializerTypeBuilder.CreateType();
             CreatedTypes.Add(baseSerializerType.Name, baseSerializerType);
 
             return baseSerializer;
@@ -316,7 +312,7 @@ namespace System.Xml.Serialization
         internal string GenerateTypedSerializer(string readMethod, string writeMethod, XmlMapping mapping, CodeIdentifiers classes, string baseSerializer, string readerClass, string writerClass)
         {
             string serializerName = CodeIdentifier.MakeValid(Accessor.UnescapeName(mapping.Accessor.Mapping!.TypeDesc!.Name));
-            serializerName = classes.AddUnique(serializerName + "Serializer", mapping);
+            serializerName = classes.AddUnique($"{serializerName}Serializer", mapping);
 
             TypeBuilder typedSerializerTypeBuilder = CodeGenerator.CreateTypeBuilder(
                 _moduleBuilder!,
@@ -330,8 +326,8 @@ namespace System.Xml.Serialization
             ilg.BeginMethod(
                 typeof(bool),
                 "CanDeserialize",
-                new Type[] { typeof(XmlReader) },
-                new string[] { "xmlReader" },
+                s_xmlReaderType,
+                s_xmlReaderString,
                 CodeGenerator.PublicOverrideMethodAttributes
             );
 
@@ -365,8 +361,8 @@ namespace System.Xml.Serialization
                 ilg.BeginMethod(
                     typeof(void),
                     "Serialize",
-                    new Type[] { typeof(object), typeof(XmlSerializationWriter) },
-                    new string[] { "objectToSerialize", "writer" },
+                    s_objectXmlSerializationWriterType,
+                    s_objectToSerializeWriterString,
                     CodeGenerator.ProtectedOverrideMethodAttributes);
                 MethodInfo writerType_writeMethod = CreatedTypes[writerClass].GetMethod(
                     writeMethod,
@@ -389,8 +385,8 @@ namespace System.Xml.Serialization
                 ilg.BeginMethod(
                     typeof(object),
                     "Deserialize",
-                    new Type[] { typeof(XmlSerializationReader) },
-                    new string[] { "reader" },
+                    s_xmlSerializationReaderType,
+                    s_readerString,
                     CodeGenerator.ProtectedOverrideMethodAttributes);
                 MethodInfo readerType_readMethod = CreatedTypes[readerClass].GetMethod(
                     readMethod,
@@ -403,7 +399,7 @@ namespace System.Xml.Serialization
                 ilg.EndMethod();
             }
             typedSerializerTypeBuilder.DefineDefaultConstructor(CodeGenerator.PublicMethodAttributes);
-            Type typedSerializerType = typedSerializerTypeBuilder.CreateTypeInfo()!.AsType();
+            Type typedSerializerType = typedSerializerTypeBuilder.CreateType();
             CreatedTypes.Add(typedSerializerType.Name, typedSerializerType);
 
             return typedSerializerType.Name;
@@ -441,8 +437,8 @@ namespace System.Xml.Serialization
             ilg.BeginMethod(
                 typeof(XmlSerializer),
                 "GetSerializer",
-                new Type[] { typeof(Type) },
-                new string[] { "type" },
+                s_typeType,
+                s_typeString,
                 CodeGenerator.PublicOverrideMethodAttributes);
 
             for (int i = 0; i < xmlMappings.Length; i++)
@@ -480,7 +476,7 @@ namespace System.Xml.Serialization
             ilg.EndMethod();
         }
 
-        internal void GenerateSerializerContract(string className, XmlMapping[] xmlMappings, Type[] types, string readerType, string[] readMethods, string writerType, string[] writerMethods, Dictionary<string, string> serializers)
+        internal void GenerateSerializerContract(XmlMapping[] xmlMappings, Type[] types, string readerType, string[] readMethods, string writerType, string[] writerMethods, Dictionary<string, string> serializers)
         {
             TypeBuilder serializerContractTypeBuilder = CodeGenerator.CreateTypeBuilder(
                 _moduleBuilder!,
@@ -562,7 +558,7 @@ namespace System.Xml.Serialization
             ilg.Call(baseCtor);
             ilg.EndMethod();
             // Instantiate type
-            Type serializerContractType = serializerContractTypeBuilder.CreateTypeInfo()!.AsType();
+            Type serializerContractType = serializerContractTypeBuilder.CreateType();
             CreatedTypes.Add(serializerContractType.Name, serializerContractType);
         }
 
@@ -572,10 +568,12 @@ namespace System.Xml.Serialization
                 return ((SerializableMapping)mapping).IsAny;
             return mapping.TypeDesc!.CanBeElementValue;
         }
+
         internal void ILGenLoad(string source)
         {
             ILGenLoad(source, null);
         }
+
         internal void ILGenLoad(string source, Type? type)
         {
             if (source.StartsWith("o.@", StringComparison.Ordinal))

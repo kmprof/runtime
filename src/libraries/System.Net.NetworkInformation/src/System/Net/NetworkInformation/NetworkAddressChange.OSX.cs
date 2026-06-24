@@ -2,13 +2,13 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
-using Microsoft.Win32.SafeHandles;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using System.Threading;
-
-using CFStringRef = System.IntPtr;
+using Microsoft.Win32.SafeHandles;
 using CFRunLoopRef = System.IntPtr;
+using CFStringRef = System.IntPtr;
 
 namespace System.Net.NetworkInformation
 {
@@ -17,7 +17,7 @@ namespace System.Net.NetworkInformation
     // the documentation for CFRunLoop for more information on the components involved.
     public partial class NetworkChange
     {
-        private static object s_lockObj = new object();
+        private static readonly object s_lockObj = new object();
 
         // The dynamic store. We listen to changes in the IPv4 and IPv6 address keys.
         // When those keys change, our callback below is called (OnAddressChanged).
@@ -38,6 +38,9 @@ namespace System.Net.NetworkInformation
         private static readonly AutoResetEvent s_runLoopStartedEvent = new AutoResetEvent(false);
         private static readonly AutoResetEvent s_runLoopEndedEvent = new AutoResetEvent(false);
 
+        [UnsupportedOSPlatform("illumos")]
+        [UnsupportedOSPlatform("solaris")]
+        [UnsupportedOSPlatform("haiku")]
         public static event NetworkAddressChangedEventHandler? NetworkAddressChanged
         {
             add
@@ -75,6 +78,9 @@ namespace System.Net.NetworkInformation
             }
         }
 
+        [UnsupportedOSPlatform("illumos")]
+        [UnsupportedOSPlatform("solaris")]
+        [UnsupportedOSPlatform("haiku")]
         public static event NetworkAvailabilityChangedEventHandler? NetworkAvailabilityChanged
         {
             add
@@ -154,11 +160,10 @@ namespace System.Net.NetworkInformation
                         compAnyRegexString.DangerousGetHandle(),
                         entNetIpv6String.DangerousGetHandle()))
                 using (SafeCreateHandle patterns = Interop.CoreFoundation.CFArrayCreate(
-                        new CFStringRef[2]
-                        {
+                        [
                             ipv4Pattern.DangerousGetHandle(),
                             ipv6Pattern.DangerousGetHandle()
-                        }, (UIntPtr)2))
+                        ], (UIntPtr)2))
                 {
                     // Try to register our pattern strings with the dynamic store instance.
                     if (patterns.IsInvalid || !Interop.SystemConfiguration.SCDynamicStoreSetNotificationKeys(
@@ -177,8 +182,11 @@ namespace System.Net.NetworkInformation
                         IntPtr.Zero);
                 }
             }
-            s_runLoopThread = new Thread(RunLoopThreadStart);
-            s_runLoopThread.IsBackground = true;
+            s_runLoopThread = new Thread(RunLoopThreadStart)
+            {
+                IsBackground = true,
+                Name = ".NET Network Address Change"
+            };
             s_runLoopThread.Start();
             s_runLoopStartedEvent.WaitOne(); // Wait for the new thread to finish initialization.
         }
@@ -251,7 +259,7 @@ namespace System.Net.NetworkInformation
                     NetworkAddressChangedEventHandler handler = subscriber.Key;
                     ExecutionContext? ec = subscriber.Value;
 
-                    if (ec == null) // Flow supressed
+                    if (ec == null) // Flow suppressed
                     {
                         handler(null, EventArgs.Empty);
                     }
@@ -273,7 +281,7 @@ namespace System.Net.NetworkInformation
                     NetworkAvailabilityChangedEventHandler handler = subscriber.Key;
                     ExecutionContext? ec = subscriber.Value;
 
-                    if (ec == null) // Flow supressed
+                    if (ec == null) // Flow suppressed
                     {
                         handler(null, args);
                     }

@@ -1,8 +1,12 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_18482;
+
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 
 public struct SequentialStruct
 {
@@ -12,7 +16,7 @@ public struct SequentialStruct
     public IntPtr f3;
 }
 
-class Test
+public class Test_GitHub_18482
 {
     [MethodImpl(MethodImplOptions.NoInlining)]
     static int foo(SequentialStruct s)
@@ -28,7 +32,8 @@ class Test
         return 100;
     }
 
-    static int Main()
+    [Fact]
+    public static int TestEntryPoint()
     {
         SequentialStruct ss = new SequentialStruct();
         ss.f0 = 100;

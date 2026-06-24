@@ -1,15 +1,13 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-using System.ComponentModel;
-
 namespace System.IO.Compression
 {
     public static partial class ZipFileExtensions
     {
         /// <summary>
-        /// Creates a file on the file system with the entry?s contents and the specified name. The last write time of the file is set to the
-        /// entry?s last write time. This method does not allow overwriting of an existing file with the same name. Attempting to extract explicit
+        /// Creates a file on the file system with the entry's contents and the specified name. The last write time of the file is set to the
+        /// entry's last write time. This method does not allow overwriting of an existing file with the same name. Attempting to extract explicit
         /// directories (entries with names that end in directory separator characters) will not result in the creation of a directory.
         /// </summary>
         ///
@@ -21,8 +19,7 @@ namespace System.IO.Compression
         /// For example, on Windows-based platforms, paths must be less than 248 characters, and file names must be less than 260 characters.</exception>
         /// <exception cref="DirectoryNotFoundException">The path specified in destinationFileName is invalid (for example, it is on
         /// an unmapped drive).</exception>
-        /// <exception cref="IOException">destinationFileName already exists.
-        /// -or- An I/O error has occurred. -or- The entry is currently open for writing.
+        /// <exception cref="IOException">An I/O error has occurred. -or- The entry is currently open for writing.
         /// -or- The entry has been deleted from the archive.</exception>
         /// <exception cref="NotSupportedException">destinationFileName is in an invalid format
         /// -or- The ZipArchive that this entry belongs to was opened in a write-only mode.</exception>
@@ -37,8 +34,8 @@ namespace System.IO.Compression
             ExtractToFile(source, destinationFileName, false);
 
         /// <summary>
-        /// Creates a file on the file system with the entry?s contents and the specified name.
-        /// The last write time of the file is set to the entry?s last write time.
+        /// Creates a file on the file system with the entry's contents and the specified name.
+        /// The last write time of the file is set to the entry's last write time.
         /// This method does allows overwriting of an existing file with the same name.
         /// </summary>
         ///
@@ -50,8 +47,7 @@ namespace System.IO.Compression
         /// For example, on Windows-based platforms, paths must be less than 248 characters, and file names must be less than 260 characters.</exception>
         /// <exception cref="DirectoryNotFoundException">The path specified in destinationFileName is invalid
         /// (for example, it is on an unmapped drive).</exception>
-        /// <exception cref="IOException">destinationFileName exists and overwrite is false.
-        /// -or- An I/O error has occurred.
+        /// <exception cref="IOException">An I/O error has occurred.
         /// -or- The entry is currently open for writing.
         /// -or- The entry has been deleted from the archive.</exception>
         /// <exception cref="NotSupportedException">destinationFileName is in an invalid format
@@ -66,56 +62,132 @@ namespace System.IO.Compression
         /// <param name="overwrite">True to indicate overwrite.</param>
         public static void ExtractToFile(this ZipArchiveEntry source, string destinationFileName, bool overwrite)
         {
-            if (source == null)
-                throw new ArgumentNullException(nameof(source));
+            ExtractToFileInitialize(source, destinationFileName, overwrite, useAsync: false, out FileStreamOptions fileStreamOptions);
 
-            if (destinationFileName == null)
-                throw new ArgumentNullException(nameof(destinationFileName));
+            // When overwriting, extract to a temporary file first to avoid corrupting the destination file
+            // if an exception occurs during extraction (e.g., password-protected archive, corrupted data).
+            string extractPath = destinationFileName;
+            string? tempPath = null;
 
-            // Rely on FileStream's ctor for further checking destinationFileName parameter
-            FileMode fMode = overwrite ? FileMode.Create : FileMode.CreateNew;
-
-            using (Stream fs = new FileStream(destinationFileName, fMode, FileAccess.Write, FileShare.None, bufferSize: 0x1000, useAsync: false))
+            if (overwrite && File.Exists(destinationFileName))
             {
-                using (Stream es = source.Open())
-                    es.CopyTo(fs);
+                // Use GetTempFileName for a unique temp file in the system temp directory.
+                // This avoids conflicts and ensures cleanup by the OS if the process crashes.
+                tempPath = Path.GetTempFileName();
+                extractPath = tempPath;
             }
 
-            File.SetLastWriteTime(destinationFileName, source.LastWriteTime.DateTime);
+            try
+            {
+                using (FileStream fs = new FileStream(extractPath, fileStreamOptions))
+                {
+                    using (Stream es = source.Open())
+                        es.CopyTo(fs);
+                }
+
+                // Move the temporary file to the destination only after successful extraction
+                if (tempPath is not null)
+                {
+                    File.Move(tempPath, destinationFileName, overwrite: true);
+                }
+
+                ExtractToFileFinalize(source, destinationFileName);
+            }
+            catch
+            {
+                // Clean up the temporary file if extraction failed
+                if (tempPath is not null && File.Exists(tempPath))
+                {
+                    // Ignore exceptions during cleanup; the original exception is more important
+                    try { File.Delete(tempPath); } catch { }
+                }
+                throw;
+            }
         }
 
-        internal static void ExtractRelativeToDirectory(this ZipArchiveEntry source, string destinationDirectoryName) =>
-            ExtractRelativeToDirectory(source, destinationDirectoryName, overwrite: false);
-
-        internal static void ExtractRelativeToDirectory(this ZipArchiveEntry source, string destinationDirectoryName, bool overwrite)
+        private static void ExtractToFileInitialize(ZipArchiveEntry source, string destinationFileName, bool overwrite, bool useAsync, out FileStreamOptions fileStreamOptions)
         {
-            if (source == null)
-                throw new ArgumentNullException(nameof(source));
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(destinationFileName);
 
-            if (destinationDirectoryName == null)
-                throw new ArgumentNullException(nameof(destinationDirectoryName));
+            long preallocationSize = 0;
+            try
+            {
+                // .Length can throw if the entry stream has been opened for write.
+                // For archives in Update mode, we have no way to check if the entry
+                // was opened for write, so we attempt to get the length and if it fails
+                // we just skip preallocation.
+                if (source.Archive is ZipArchive archive && archive.Mode != ZipArchiveMode.Create)
+                {
+                    preallocationSize = source.Length;
+                }
+            }
+            catch (InvalidOperationException) { }
+
+            fileStreamOptions = new()
+            {
+                Access = FileAccess.Write,
+                Mode = overwrite ? FileMode.Create : FileMode.CreateNew,
+                Share = FileShare.None,
+                BufferSize = ZipFile.FileStreamBufferSize,
+                PreallocationSize = preallocationSize,
+                Options = useAsync ? FileOptions.Asynchronous : FileOptions.None
+            };
+
+            const UnixFileMode OwnershipPermissions =
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+                UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute |
+                UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute;
+
+            // Restore Unix permissions.
+            // For security, limit to ownership permissions, and respect umask (through UnixCreateMode).
+            // We don't apply UnixFileMode.None because .zip files created on Windows and .zip files created
+            // with previous versions of .NET don't include permissions.
+            UnixFileMode mode = (UnixFileMode)(source.ExternalAttributes >> 16) & OwnershipPermissions;
+            if (mode != UnixFileMode.None && !OperatingSystem.IsWindows())
+            {
+                fileStreamOptions.UnixCreateMode = mode;
+            }
+        }
+
+        private static void ExtractToFileFinalize(ZipArchiveEntry source, string destinationFileName) =>
+            ArchivingUtils.AttemptSetLastWriteTime(destinationFileName, source.LastWriteTime);
+
+        private static bool ExtractRelativeToDirectoryCheckIfFile(ZipArchiveEntry source, string destinationDirectoryName, out string fileDestinationPath)
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(destinationDirectoryName);
 
             // Note that this will give us a good DirectoryInfo even if destinationDirectoryName exists:
             DirectoryInfo di = Directory.CreateDirectory(destinationDirectoryName);
             string destinationDirectoryFullPath = di.FullName;
             if (!destinationDirectoryFullPath.EndsWith(Path.DirectorySeparatorChar))
-                destinationDirectoryFullPath += Path.DirectorySeparatorChar;
+            {
+                char sep = Path.DirectorySeparatorChar;
+                destinationDirectoryFullPath = string.Concat(destinationDirectoryFullPath, new ReadOnlySpan<char>(in sep));
+            }
 
-            string fileDestinationPath = Path.GetFullPath(Path.Combine(destinationDirectoryFullPath, source.FullName));
+            fileDestinationPath = Path.GetFullPath(Path.Combine(destinationDirectoryFullPath, ArchivingUtils.SanitizeEntryFilePath(source.FullName)));
 
             if (!fileDestinationPath.StartsWith(destinationDirectoryFullPath, PathInternal.StringComparison))
                 throw new IOException(SR.IO_ExtractingResultsInOutside);
 
             if (Path.GetFileName(fileDestinationPath).Length == 0)
             {
-                // If it is a directory:
-
                 if (source.Length != 0)
                     throw new IOException(SR.IO_DirectoryNameWithData);
 
                 Directory.CreateDirectory(fileDestinationPath);
+
+                return false; // It is a directory
             }
-            else
+
+            return true; // It is a file
+        }
+
+        internal static void ExtractRelativeToDirectory(this ZipArchiveEntry source, string destinationDirectoryName, bool overwrite)
+        {
+            if (ExtractRelativeToDirectoryCheckIfFile(source, destinationDirectoryName, out string fileDestinationPath))
             {
                 // If it is a file:
                 // Create containing directory:

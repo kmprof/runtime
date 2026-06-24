@@ -3,24 +3,29 @@
 
 // The test showed CSE issues with struct return retyping.
 
+
+namespace Runtime_33884;
+
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 
 struct RefWrapper
 {
     public Object a; // a ref field
 }
 
-class TestStructs
+public class TestStructs
 {
     static RefWrapper[] arr;
 
-    public static RefWrapper GetElement() // 8 byte size return will be retyped as a ref.
+    static RefWrapper GetElement() // 8 byte size return will be retyped as a ref.
     {
         return arr[0];
     }
 
-    public static int Main()
+    [Fact]
+    public static void TestEntryPoint()
     {
         RefWrapper a = new RefWrapper();
         arr = new RefWrapper[1];
@@ -28,6 +33,5 @@ class TestStructs
 
         RefWrapper e = GetElement(); // force struct retyping to ref.
         arr[0] = e; // a struct typed copy.
-        return 100;
     }
 }

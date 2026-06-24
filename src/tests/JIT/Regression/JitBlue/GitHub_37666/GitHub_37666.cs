@@ -1,8 +1,12 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_37666;
+
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 
 public struct TwoBools
 {
@@ -16,9 +20,10 @@ public struct TwoBools
     }
 }
 
-class Test
+public class Test_GitHub_37666
 {
-    public static int Main()
+    [Fact]
+    public static int TestEntryPoint()
     {
         int result = 100;
 

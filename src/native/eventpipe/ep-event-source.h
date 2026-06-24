@@ -1,10 +1,9 @@
 #ifndef __EVENTPIPE_EVENT_SOURCE_H__
 #define __EVENTPIPE_EVENT_SOURCE_H__
 
-#include <config.h>
+#include "ep-rt-config.h"
 
 #ifdef ENABLE_PERFTRACING
-#include "ep-rt-config.h"
 #include "ep-types.h"
 
 #undef EP_IMPL_GETTER_SETTER
@@ -12,6 +11,10 @@
 #define EP_IMPL_GETTER_SETTER
 #endif
 #include "ep-getter-setter.h"
+
+extern const ep_char8_t *_ep_os_info;
+extern const ep_char8_t *_ep_arch_info;
+extern EventPipeEventSource _ep_event_source_instance;
 
 /*
  * EventPipeEventSource.
@@ -39,7 +42,6 @@ inline
 const ep_char8_t *
 ep_event_source_get_os_info (void)
 {
-	extern const ep_char8_t *_ep_os_info;
 	return _ep_os_info;
 }
 
@@ -48,7 +50,6 @@ inline
 const ep_char8_t *
 ep_event_source_get_arch_info (void)
 {
-	extern const ep_char8_t *_ep_arch_info;
 	return _ep_arch_info;
 }
 
@@ -75,8 +76,7 @@ inline
 EventPipeEventSource *
 ep_event_source_get (void)
 {
-	// Singelton.
-	extern EventPipeEventSource _ep_event_source_instance;
+	// Singleton.
 	return &_ep_event_source_instance;
 }
 

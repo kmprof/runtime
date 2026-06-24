@@ -1,8 +1,12 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_16210_3;
+
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 
  public struct float4
 {
@@ -20,7 +24,7 @@ using System.Runtime.CompilerServices;
     public float w;
 }
 
-class X
+public class X
 {
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static float P(int i)
@@ -31,7 +35,8 @@ class X
         return Unsafe.Add(ref p, i);
     }
 
-    public static int Main()
+    [Fact]
+    public static int TestEntryPoint()
     {
         float v0 = P(0);
         float v1 = P(1);

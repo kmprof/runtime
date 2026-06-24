@@ -8,17 +8,26 @@ using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Numerics;
+using Xunit;
 
-namespace Test
+namespace GitHub_8220
 {
 
     public class Program
     {
         static Random random;
 
+        public const int DefaultSeed = 20010415;
+        public static int Seed = Environment.GetEnvironmentVariable("CORECLR_SEED") switch
+        {
+            string seedStr when seedStr.Equals("random", StringComparison.OrdinalIgnoreCase) => new Random().Next(),
+            string seedStr when int.TryParse(seedStr, out int envSeed) => envSeed,
+            _ => DefaultSeed
+        };
+
         static Program()
         {
-            random = new Random(1);
+            random = new Random(Seed);
         }
 
         [MethodImpl( MethodImplOptions.NoInlining )]
@@ -137,7 +146,8 @@ namespace Test
             return 100;
         }
 
-        public static int Main()
+        [Fact]
+        public static int TestEntryPoint()
         {
             int returnValue = 100;
             Console.WriteLine("Testing Dot Product");

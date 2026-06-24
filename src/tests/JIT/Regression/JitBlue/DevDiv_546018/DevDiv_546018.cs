@@ -10,23 +10,27 @@
 // part of 256-bit registers. The fix was for codegen to request a single temp int register
 // and assert that there was only one.
 
+
+namespace DevDiv_546018;
+
 using System;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using Xunit;
 
-class Test
+public class Test
 {
     static Random random;
 
-    public static int Main ()
+    [Fact]
+    public static void TestEntryPoint()
     {
         random = new Random ();
         VectorSingle_op_Division_VectorSingle_VectorSingle (5);
-        return 100;
     }
 
     [MethodImpl (MethodImplOptions.NoInlining)]
-    public static void VectorSingle_op_Division_VectorSingle_VectorSingle (long iterations)
+    internal static void VectorSingle_op_Division_VectorSingle_VectorSingle (long iterations)
     {
         Vector<float> dividend = CreateRandomVector ();
         Vector<float> divisor = CreateRandomVector ();

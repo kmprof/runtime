@@ -2,6 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using Microsoft.Win32.SafeHandles;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Microsoft.DotNet.XUnitExtensions;
 using Xunit;
@@ -17,6 +18,7 @@ namespace System.IO.MemoryMappedFiles.Tests
         /// Test to validate the offset, size, and access parameters to MemoryMappedFile.CreateViewAccessor.
         /// </summary>
         [Fact]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/51375", TestPlatforms.iOS | TestPlatforms.tvOS | TestPlatforms.MacCatalyst)]
         public void InvalidArguments()
         {
             int mapLength = s_pageSize.Value;
@@ -55,24 +57,33 @@ namespace System.IO.MemoryMappedFiles.Tests
             }
         }
 
+        public static IEnumerable<object[]> AccessLevelCombinationsData()
+        {
+            yield return new object[] { MemoryMappedFileAccess.ReadWriteExecute, MemoryMappedFileAccess.Read };
+            yield return new object[] { MemoryMappedFileAccess.ReadWriteExecute, MemoryMappedFileAccess.Write };
+            yield return new object[] { MemoryMappedFileAccess.ReadWriteExecute, MemoryMappedFileAccess.ReadWrite };
+            yield return new object[] { MemoryMappedFileAccess.ReadWriteExecute, MemoryMappedFileAccess.CopyOnWrite };  
+            yield return new object[] { MemoryMappedFileAccess.ReadWriteExecute, MemoryMappedFileAccess.ReadExecute };
+            yield return new object[] { MemoryMappedFileAccess.ReadWriteExecute, MemoryMappedFileAccess.ReadWriteExecute };
+            yield return new object[] { MemoryMappedFileAccess.ReadExecute, MemoryMappedFileAccess.Read };
+            yield return new object[] { MemoryMappedFileAccess.ReadExecute, MemoryMappedFileAccess.CopyOnWrite };
+            // https://github.com/dotnet/runtime/issues/114403
+            if (PlatformDetection.IsNotMacCatalyst)
+            {
+                yield return new object[] { MemoryMappedFileAccess.ReadExecute, MemoryMappedFileAccess.ReadExecute };
+            }
+            yield return new object[] { MemoryMappedFileAccess.CopyOnWrite, MemoryMappedFileAccess.Read };
+            yield return new object[] { MemoryMappedFileAccess.CopyOnWrite, MemoryMappedFileAccess.CopyOnWrite };
+            yield return new object[] { MemoryMappedFileAccess.ReadWrite, MemoryMappedFileAccess.Read };
+            yield return new object[] { MemoryMappedFileAccess.ReadWrite, MemoryMappedFileAccess.Write };
+            yield return new object[] { MemoryMappedFileAccess.ReadWrite, MemoryMappedFileAccess.ReadWrite };
+            yield return new object[] { MemoryMappedFileAccess.ReadWrite, MemoryMappedFileAccess.CopyOnWrite };
+            yield return new object[] { MemoryMappedFileAccess.Read, MemoryMappedFileAccess.Read };
+            yield return new object[] { MemoryMappedFileAccess.Read, MemoryMappedFileAccess.CopyOnWrite };
+        }
+
         [ConditionalTheory]
-        [InlineData(MemoryMappedFileAccess.ReadWriteExecute, MemoryMappedFileAccess.Read)]
-        [InlineData(MemoryMappedFileAccess.ReadWriteExecute, MemoryMappedFileAccess.Write)]
-        [InlineData(MemoryMappedFileAccess.ReadWriteExecute, MemoryMappedFileAccess.ReadWrite)]
-        [InlineData(MemoryMappedFileAccess.ReadWriteExecute, MemoryMappedFileAccess.CopyOnWrite)]
-        [InlineData(MemoryMappedFileAccess.ReadWriteExecute, MemoryMappedFileAccess.ReadExecute)]
-        [InlineData(MemoryMappedFileAccess.ReadWriteExecute, MemoryMappedFileAccess.ReadWriteExecute)]
-        [InlineData(MemoryMappedFileAccess.ReadExecute, MemoryMappedFileAccess.Read)]
-        [InlineData(MemoryMappedFileAccess.ReadExecute, MemoryMappedFileAccess.CopyOnWrite)]
-        [InlineData(MemoryMappedFileAccess.ReadExecute, MemoryMappedFileAccess.ReadExecute)]
-        [InlineData(MemoryMappedFileAccess.CopyOnWrite, MemoryMappedFileAccess.Read)]
-        [InlineData(MemoryMappedFileAccess.CopyOnWrite, MemoryMappedFileAccess.CopyOnWrite)]
-        [InlineData(MemoryMappedFileAccess.ReadWrite, MemoryMappedFileAccess.Read)]
-        [InlineData(MemoryMappedFileAccess.ReadWrite, MemoryMappedFileAccess.Write)]
-        [InlineData(MemoryMappedFileAccess.ReadWrite, MemoryMappedFileAccess.ReadWrite)]
-        [InlineData(MemoryMappedFileAccess.ReadWrite, MemoryMappedFileAccess.CopyOnWrite)]
-        [InlineData(MemoryMappedFileAccess.Read, MemoryMappedFileAccess.Read)]
-        [InlineData(MemoryMappedFileAccess.Read, MemoryMappedFileAccess.CopyOnWrite)]
+        [MemberData(nameof(AccessLevelCombinationsData))]
         public void ValidAccessLevelCombinations(MemoryMappedFileAccess mapAccess, MemoryMappedFileAccess viewAccess)
         {
             const int Capacity = 4096;
@@ -89,10 +100,10 @@ namespace System.IO.MemoryMappedFiles.Tests
                 }
                 catch (UnauthorizedAccessException)
                 {
-                    if ((OperatingSystem.IsMacOS() || PlatformDetection.IsInContainer) &&
+                    if ((OperatingSystem.IsMacOS() || OperatingSystem.IsMacCatalyst() || OperatingSystem.IsIOS() || OperatingSystem.IsTvOS() || PlatformDetection.IsInContainer) &&
                        (viewAccess == MemoryMappedFileAccess.ReadExecute || viewAccess == MemoryMappedFileAccess.ReadWriteExecute))
                     {
-                        // Containers and OSX with SIP enabled do not have execute permissions by default.
+                        // Containers and OSXlike platforms with SIP enabled do not have execute permissions by default.
                         throw new SkipTestException("Insufficient execute permission.");
                     }
 
@@ -346,7 +357,7 @@ namespace System.IO.MemoryMappedFiles.Tests
         /// Test to validate that multiple accessors over the same map share data appropriately.
         /// </summary>
         [Fact]
-        [PlatformSpecific(~TestPlatforms.Browser)] // the emscripten implementation doesn't share data
+        [SkipOnPlatform(TestPlatforms.Browser, "the emscripten implementation doesn't share data")]
         public void ViewsShareData()
         {
             const int MapLength = 256;
@@ -474,6 +485,7 @@ namespace System.IO.MemoryMappedFiles.Tests
         /// Test to verify that we can still use a view after the associated map has been disposed.
         /// </summary>
         [Fact]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/83197", TestPlatforms.Browser)]
         public void UseAfterMMFDisposal()
         {
             foreach (MemoryMappedFile mmf in CreateSampleMaps(8192))

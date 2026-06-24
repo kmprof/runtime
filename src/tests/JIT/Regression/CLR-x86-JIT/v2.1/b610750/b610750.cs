@@ -8,9 +8,13 @@
 // the changes done by brian to the product code. 
 // Well, and it runs fast. 
 
-using System;
 
-class Program
+namespace b610750;
+
+using System;
+using Xunit;
+
+public class Program
 {
     static bool failed = false;
 
@@ -2015,7 +2019,9 @@ class Program
 
     }
 
-    static int Main(string[] args)
+    [OuterLoop]
+    [Fact]
+    public static int TestEntryPoint()
     {
         TestSHL();
 

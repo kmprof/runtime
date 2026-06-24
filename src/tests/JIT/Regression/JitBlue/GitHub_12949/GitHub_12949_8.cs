@@ -1,9 +1,13 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_12949_8;
+
 using System;
 using System.Runtime.CompilerServices;
 using System.Numerics;
+using Xunit;
 
 public class X<K> 
 {
@@ -21,9 +25,11 @@ public class X<K>
     public K k;
 }
 
-class B
+public class B
 {
-    public static int Main()
+    [OuterLoop]
+    [Fact]
+    public static int TestEntryPoint()
     {
         X<Vector3> a = null;
         bool result = false;

@@ -1,8 +1,12 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_12949_5;
+
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 
 struct R
 {
@@ -25,9 +29,11 @@ public class X<K>
     public K k;
 }
 
-class B
+public class B
 {
-    public static int Main()
+    [OuterLoop]
+    [Fact]
+    public static int TestEntryPoint()
     {
         X<R> a = null;
         bool result = false;

@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 //
 //  Test case for a GC Stress 4 failure
 //
@@ -15,6 +16,9 @@ using System.Runtime.CompilerServices;
 //  into a new compiler temp, before storing any outgoing arguments.
 //
 
+
+namespace GitHub_16892;
+
 class Item
 {
     int _value;
@@ -26,9 +30,9 @@ class Item
     public int GetValue() { return _value; }
 }
 
-class Program
+public class Program
 {
-    public Item[] itemArray;
+    Item[] itemArray;
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     void Init()
@@ -58,8 +62,8 @@ class Program
         Item[] arr = itemArray;
         int result = 0;
 
-        // Insure that we have to generate fully interruptible GC information
-        // Form a possible infinte loop that the JIT believes could execute
+        // Ensure that we have to generate fully interruptible GC information
+        // Form a possible infinite loop that the JIT believes could execute
         // without encountering a GC safe point.
         //
         do {
@@ -73,7 +77,8 @@ class Program
             
     }
 
-    static int Main(string[] args)
+    [Fact]
+    public static int TestEntryPoint()
     {
         Program prog = new Program();
 

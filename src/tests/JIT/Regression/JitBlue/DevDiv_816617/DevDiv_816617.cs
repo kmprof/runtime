@@ -2,13 +2,19 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 //
 
-using System;
 
-static class Repro
+namespace DevDiv_816617_ro;
+
+using System;
+using Xunit;
+
+public static class Repro
 {
     static double NegativeZero = -0.0;
 
-    static int Main()
+    [OuterLoop]
+    [Fact]
+    public static int TestEntryPoint()
     {
         // This testcase ensures that we explicitly add Negative zero
         // and Positive Zero producing Positive Zero(0x00000000 000000000)

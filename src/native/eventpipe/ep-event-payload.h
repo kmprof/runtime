@@ -1,10 +1,9 @@
 #ifndef __EVENTPIPE_EVENT_PAYLOAD_H__
 #define __EVENTPIPE_EVENT_PAYLOAD_H__
 
-#include <config.h>
+#include "ep-rt-config.h"
 
 #ifdef ENABLE_PERFTRACING
-#include "ep-rt-config.h"
 #include "ep-types.h"
 
 #undef EP_IMPL_GETTER_SETTER
@@ -79,6 +78,8 @@ struct _EventPipeEventPayload {
 #endif
 
 EP_DEFINE_GETTER(EventPipeEventPayload *, event_payload, uint8_t *, data)
+EP_DEFINE_GETTER(EventPipeEventPayload *, event_payload, const EventData *, event_data)
+EP_DEFINE_GETTER(EventPipeEventPayload *, event_payload, uint32_t, event_data_len)
 EP_DEFINE_GETTER(EventPipeEventPayload *, event_payload, uint32_t, size)
 
 static
@@ -108,7 +109,7 @@ void
 ep_event_payload_fini (EventPipeEventPayload *event_payload);
 
 // Copy the data (whether flat or array of objects) into a flat buffer at dst
-// Assumes that dst points to an appropriatly sized buffer.
+// Assumes that dst points to an appropriately sized buffer.
 void
 ep_event_payload_copy_data (
 	EventPipeEventPayload *event_payload,

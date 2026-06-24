@@ -2,9 +2,13 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 //
 
+
+namespace GitHub_19171;
+
 using System;
 using System.Threading;
 using System.Runtime.CompilerServices;
+using Xunit;
 public class GitHub_19171
 {
     public static long g_static = -1;
@@ -17,7 +21,7 @@ public class GitHub_19171
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void Function(long value)
+    internal static void Function(long value)
     {
         g_static = value;
 
@@ -26,7 +30,9 @@ public class GitHub_19171
             returnVal = -1;
         }
     }
-    public static int Main()
+    [OuterLoop]
+    [Fact]
+    public static int TestEntryPoint()
     {
         Function(7);
         Function(11);

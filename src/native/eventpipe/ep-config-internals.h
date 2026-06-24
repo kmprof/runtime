@@ -1,10 +1,9 @@
 #ifndef __EVENTPIPE_CONFIGURATION_INTERNALS_H__
 #define __EVENTPIPE_CONFIGURATION_INTERNALS_H__
 
-#include <config.h>
+#include "ep-rt-config.h"
 
 #ifdef ENABLE_PERFTRACING
-#include "ep-rt-config.h"
 #include "ep-types.h"
 
 /*
@@ -30,7 +29,6 @@ config_create_provider (
 	EventPipeConfiguration *config,
 	const ep_char8_t *provider_name,
 	EventPipeCallback callback_func,
-	EventPipeCallbackDataFree callback_data_free_func,
 	void *callback_data,
 	EventPipeProviderCallbackDataQueue *provider_callback_data_queue);
 

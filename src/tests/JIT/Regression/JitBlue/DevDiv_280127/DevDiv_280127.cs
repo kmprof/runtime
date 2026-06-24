@@ -1,15 +1,19 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace DevDiv_280127;
+
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 
 // The original repro for this test was an assertion after code generation that the actual maximum depth of the stack
 // was less than or identical to the estimated depth of the stack as calculated during morph. The calculation was
 // incorrect when a math intrinsic was used as an argument to a function with on-stack parameters (e.g. the call to
 // `M` on line 18).
 
-static class C
+public static class C
 {
     struct S
     {
@@ -29,7 +33,9 @@ static class C
         return 100;
     }
 
-    static int Main()
+    [OuterLoop]
+    [Fact]
+    public static int TestEntryPoint()
     {
         return M(2.0);
     }

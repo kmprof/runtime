@@ -4,6 +4,7 @@
 
 using System.Runtime.InteropServices;
 using System;
+using Xunit;
 
 
 internal class NullableTest1
@@ -4693,9 +4694,11 @@ internal class NullableTest45
 }
 
 
-internal class Test
+public class Test_boxunboxvaluetype
 {
-    private static int Main()
+    [ActiveIssue("https://github.com/dotnet/runtime/issues/129508", TestRuntimes.Mono)]
+    [Fact]
+    public static int TestEntryPoint()
     {
         try
         {

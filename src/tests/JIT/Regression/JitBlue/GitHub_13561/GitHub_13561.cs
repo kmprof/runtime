@@ -1,10 +1,14 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_13561;
+
 using System;
 using System.Collections.Generic;
+using Xunit;
 
-internal static class Program
+public static class Program
 {
     class MemberInfo { }
 
@@ -53,7 +57,8 @@ internal static class Program
         return result;
     }
 
-    private static int Main(string[] args)
+    [Fact]
+    public static int TestEntryPoint()
     {
         return GetCustomAttribute<Attribute>(new PropertyInfo()) != null ? 100 : -1;
     }

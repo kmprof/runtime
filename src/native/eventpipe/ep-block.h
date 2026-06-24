@@ -1,10 +1,9 @@
 #ifndef __EVENTPIPE_BLOCK_H__
 #define __EVENTPIPE_BLOCK_H__
 
-#include <config.h>
+#include "ep-rt-config.h"
 
 #ifdef ENABLE_PERFTRACING
-#include "ep-rt-config.h"
 #include "ep-types.h"
 #include "ep-stream.h"
 
@@ -351,7 +350,7 @@ bool
 ep_stack_block_write_stack (
 	EventPipeStackBlock *stack_block,
 	uint32_t stack_id,
-	EventPipeStackContents *stack);
+	EventPipeStackContentsInstance *stack);
 
 static
 inline

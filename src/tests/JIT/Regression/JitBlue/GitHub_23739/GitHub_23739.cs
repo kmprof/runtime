@@ -2,10 +2,14 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 //
 
+
+namespace GitHub_23739;
+
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 
-class GitHub_23739
+public class GitHub_23739
 {
     struct Struct1f
     {
@@ -186,7 +190,8 @@ class GitHub_23739
         Sink(ref l3);
     }
 
-    static int Main()
+    [Fact]
+    public static void TestEntryPoint()
     {
         Cls1f cls1f = new Cls1f();
         Test1f(cls1f);
@@ -205,7 +210,5 @@ class GitHub_23739
 
         Cls6f cls6f = new Cls6f();
         Test6f(cls6f);
-
-        return 100;
     }
 }

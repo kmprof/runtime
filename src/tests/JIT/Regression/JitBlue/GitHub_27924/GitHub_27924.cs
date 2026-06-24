@@ -6,11 +6,21 @@ using System.Threading;
 using System.Runtime.CompilerServices;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Xunit;
+using TestLibrary;
 
-class Program
+public class Program
 {
     static int returnVal = 100;
     static byte[][] s = new byte[1000][];
+
+    public const int DefaultSeed = 20010415;
+    public static int Seed = Environment.GetEnvironmentVariable("CORECLR_SEED") switch
+    {
+        string seedStr when seedStr.Equals("random", StringComparison.OrdinalIgnoreCase) => new Random().Next(),
+        string seedStr when int.TryParse(seedStr, out int envSeed) => envSeed,
+        _ => DefaultSeed
+    };
 
     static void Work()
     {
@@ -30,7 +40,9 @@ class Program
         }
     }
 
-    static int Main(string[] args)
+    [ActiveIssue("https://github.com/dotnet/runtime/issues/41472", typeof(PlatformDetection), nameof(PlatformDetection.IsNotMultithreadingSupported))]
+    [Fact]
+    public static int TestEntryPoint()
     {
         for(int i = 0; i < s.Length; i++) s[i] = new byte[2];
 
@@ -40,7 +52,7 @@ class Program
             tasks.Add(Task.Run(Work));
         }
 
-        Random r = new Random();
+        Random r = new Random(Seed);
         for (uint i = 0; i < 10000; i++)
         {
             s[r.Next(s.Length)] = new byte[3 + r.Next(100)];

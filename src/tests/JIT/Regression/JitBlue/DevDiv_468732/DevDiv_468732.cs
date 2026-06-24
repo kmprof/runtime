@@ -3,9 +3,13 @@
 
 // Repro case for a bug involving byref-typed appearances of int-typed lclVars.
 
-using System.Runtime.CompilerServices;
 
-struct S
+namespace DevDiv_468732;
+
+using System.Runtime.CompilerServices;
+using Xunit;
+
+public struct S
 {
     int i;
 
@@ -21,7 +25,9 @@ struct S
         return s;
     }
 
-    static unsafe int Main()
+    [OuterLoop]
+    [Fact]
+    public static unsafe int TestEntryPoint()
     {
         S s;
         return Test(&s)->i;

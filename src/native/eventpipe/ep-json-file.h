@@ -1,10 +1,9 @@
 #ifndef __EVENTPIPE_JSON_FILE_H__
 #define __EVENTPIPE_JSON_FILE_H__
 
-#include <config.h>
+#include "ep-rt-config.h"
 
 #ifdef ENABLE_PERFTRACING
-#include "ep-rt-config.h"
 #include "ep-types.h"
 #include "ep-rt.h"
 
@@ -53,7 +52,7 @@ ep_json_file_write_event_data (
 	ep_timestamp_t timestamp,
 	ep_rt_thread_id_t thread_id,
 	const ep_char8_t *message,
-	EventPipeStackContents *stack_contents);
+	EventPipeStackContentsInstance *stack_contents);
 
 #endif /* EP_CHECKED_BUILD */
 #endif /* ENABLE_PERFTRACING */

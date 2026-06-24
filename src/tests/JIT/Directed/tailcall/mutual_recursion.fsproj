@@ -1,15 +1,18 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+    <!-- Work around test failure https://github.com/dotnet/runtime/issues/106601 -->
+    <RealSig>false</RealSig>
   </PropertyGroup>
   <PropertyGroup>
-    <NoStandardLib>True</NoStandardLib>
-    <Noconfig>True</Noconfig>
     <Optimize>True</Optimize>
-    <JitOptimizationSensitive>True</JitOptimizationSensitive>
     <TargetFramework>$(NetCoreAppToolCurrent)</TargetFramework>
+    <!-- F# does not emit tail calls in Debug builds, leading to stack overflow. See https://github.com/dotnet/runtime/issues/127437 -->
+    <DisableProjectBuild Condition="'$(Configuration)' == 'Debug'">true</DisableProjectBuild>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="mutual_recursion.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="$(TestLibraryProjectPath)" />
   </ItemGroup>
 </Project>

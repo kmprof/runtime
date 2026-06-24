@@ -3,9 +3,16 @@
 
 namespace System.Diagnostics
 {
-    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method | AttributeTargets.Constructor | AttributeTargets.Struct, Inherited = false)]
+    /// <summary>
+    /// Types and Methods attributed with StackTraceHidden will be omitted from the stack trace text shown in StackTrace.ToString()
+    /// and Exception.StackTrace
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Constructor | AttributeTargets.Interface | AttributeTargets.Method | AttributeTargets.Struct, Inherited = false)]
     public sealed class StackTraceHiddenAttribute : Attribute
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StackTraceHiddenAttribute"/> class.
+        /// </summary>
         public StackTraceHiddenAttribute() { }
     }
 }

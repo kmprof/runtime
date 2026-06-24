@@ -1,9 +1,13 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace DevDiv_200492;
+
 using System;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using Xunit;
 
 // Regression test for bug 200492, in which the x64 codegen for
 // integer casts would unconditionally suppress same-register
@@ -15,7 +19,7 @@ using System.Runtime.CompilerServices;
 // so this test (like the original code in the bug report)
 // uses custom attribute constructor arguments as the sources
 // of the casts in question.
-internal class Program
+public class Program
 {
     [AttributeUsage(AttributeTargets.Method)]
     class TestDoubleAttribute : System.Attribute
@@ -76,7 +80,9 @@ internal class Program
         return (attribute.Field == (ulong)6);
     }
 
-    private static int Main()
+    [OuterLoop]
+    [Fact]
+    public static int TestEntryPoint()
     {
         int errors = 0;
 

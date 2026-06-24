@@ -35,7 +35,7 @@ namespace System.Timers.Tests
             }
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsThreadingSupported))]
+        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsMultithreadingSupported))]
         public void TestTimerStartAutoReset()
         {
             using (var timer = new TestTimer(1))
@@ -62,6 +62,7 @@ namespace System.Timers.Tests
                 target = 10;
                 mres.Reset();
                 timer.AutoReset = true;
+                timer.Start();
                 mres.Wait();
 
                 timer.Stop();
@@ -94,6 +95,14 @@ namespace System.Timers.Tests
             }
         }
 
+        [Fact]
+        public void ElapsedEventArgs_Ctor_SignalTime()
+        {
+            DateTime now = DateTime.Now;
+            ElapsedEventArgs args = new ElapsedEventArgs(now);
+            Assert.Equal(now, args.SignalTime);
+        }
+
         [Theory]
         [InlineData(int.MaxValue)]
         [InlineData(0.5D)]
@@ -104,6 +113,34 @@ namespace System.Timers.Tests
                 Assert.Equal(Math.Ceiling(interval), timer.Interval);
                 timer.Interval = interval;
                 Assert.Equal(interval, timer.Interval);
+            }
+        }
+
+        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsMultithreadingSupported))]
+        public void SettingAutoResetOrIntervalOnDisabledOneShotTimerDoesNotRestartIt()
+        {
+            using (var timer = new TestTimer(1))
+            {
+                var mres = new ManualResetEventSlim();
+
+                timer.AutoReset = false;
+                timer.Elapsed += (sender, e) => mres.Set();
+                timer.Start();
+
+                mres.Wait();
+                Assert.False(timer.Enabled);
+
+                // Setting AutoReset should not restart a disabled timer
+                mres.Reset();
+                timer.AutoReset = true;
+                Assert.False(timer.Enabled);
+                Assert.False(mres.Wait(100), "Timer callback should not have fired after setting AutoReset");
+
+                // Setting Interval should not restart a disabled timer
+                mres.Reset();
+                timer.Interval = 1;
+                Assert.False(timer.Enabled);
+                Assert.False(mres.Wait(100), "Timer callback should not have fired after setting Interval");
             }
         }
     }

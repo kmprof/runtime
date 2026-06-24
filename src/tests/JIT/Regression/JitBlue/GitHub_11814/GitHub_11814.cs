@@ -4,10 +4,14 @@
 // Repro case for a bug involving failure to rewrite all references
 // to a promoted implicit byref struct parameter.
 
+
+namespace GitHub_11814;
+
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 
-class MutateStructArg
+public class MutateStructArg
 {
     public struct P
     {
@@ -15,7 +19,9 @@ class MutateStructArg
         public int X;
     }
 
-    public static int Main()
+    [OuterLoop]
+    [Fact]
+    public static int TestEntryPoint()
     {
         P l1 = new P();
         l1.S = "Hello World";

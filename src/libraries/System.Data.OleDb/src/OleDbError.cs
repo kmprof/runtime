@@ -24,8 +24,8 @@ namespace System.Data.OleDb
 
                 if (OleDbHResult.DB_E_NOLOCALE == hr)
                 {
-                    Marshal.ReleaseComObject(errorInfo);
-                    lcid = SafeNativeMethods.GetUserDefaultLCID();
+                    UnsafeNativeMethods.ReleaseComWrappersObject(errorInfo);
+                    lcid = Interop.Kernel32.GetUserDefaultLCID();
                     errorInfo = errorRecords.GetErrorInfo(index, lcid);
 
                     if (null != errorInfo)
@@ -43,8 +43,8 @@ namespace System.Data.OleDb
 
                     if (OleDbHResult.DB_E_NOLOCALE == hr)
                     {
-                        Marshal.ReleaseComObject(errorInfo);
-                        lcid = SafeNativeMethods.GetUserDefaultLCID();
+                        UnsafeNativeMethods.ReleaseComWrappersObject(errorInfo);
+                        lcid = Interop.Kernel32.GetUserDefaultLCID();
                         errorInfo = errorRecords.GetErrorInfo(index, lcid);
 
                         if (null != errorInfo)
@@ -56,17 +56,17 @@ namespace System.Data.OleDb
                     {
                         this.source = ODB.FailedGetSource(hr);
                     }
-                    Marshal.ReleaseComObject(errorInfo!);
+                    UnsafeNativeMethods.ReleaseComWrappersObject(errorInfo);
                 }
             }
 
             UnsafeNativeMethods.ISQLErrorInfo sqlErrorInfo;
-            hr = errorRecords.GetCustomErrorObject(index, ref ODB.IID_ISQLErrorInfo, out sqlErrorInfo);
+            errorRecords.GetCustomErrorObject(index, in ODB.IID_ISQLErrorInfo, out sqlErrorInfo);
 
             if (null != sqlErrorInfo)
             {
                 this.nativeError = sqlErrorInfo.GetSQLInfo(out this.sqlState);
-                Marshal.ReleaseComObject(sqlErrorInfo);
+                UnsafeNativeMethods.ReleaseComWrappersObject(sqlErrorInfo);
             }
         }
 
@@ -74,8 +74,7 @@ namespace System.Data.OleDb
         {
             get
             {
-                string? message = this.message;
-                return ((null != message) ? message : string.Empty);
+                return this.message ?? string.Empty;
             }
         }
 
@@ -91,8 +90,7 @@ namespace System.Data.OleDb
         {
             get
             {
-                string? source = this.source;
-                return ((null != source) ? source : string.Empty);
+                return this.source ?? string.Empty;
             }
         }
 
@@ -100,8 +98,7 @@ namespace System.Data.OleDb
         {
             get
             {
-                string? sqlState = this.sqlState;
-                return ((null != sqlState) ? sqlState : string.Empty);
+                return this.sqlState ?? string.Empty;
             }
         }
 

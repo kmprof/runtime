@@ -7,10 +7,14 @@
 // It causes assert when cse processes the child with the clean vn state.
 
 
+
+namespace DevDiv_278526;
+
 using System;
+using Xunit;
 
 
-class Program
+public class Program
 {
       public sealed class Variables
     {
@@ -37,10 +41,11 @@ class Program
         return true;
     }
 
-    public static int Main(string[] args)
+    [OuterLoop]
+    [Fact]
+    public static void TestEntryPoint()
     {
         string s = "skip"; // Test checks commpilation process.
         VerifyMacvalueSSlV2(s);
-        return 100;
     }
 }

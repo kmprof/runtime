@@ -5,16 +5,21 @@
 // array of byte vs. an array of structs containing a single byte field.
 // They should generate the same code.
 
+
+namespace GitHub_11407;
+
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 
-class GitHub_11407
+public class GitHub_11407
 {
     struct foo { public byte b1, b2, b3, b4; }
     [MethodImpl(MethodImplOptions.NoInlining)]
     static foo getfoo() { return new foo(); }
 
-    static int Main()
+    [Fact]
+    public static int TestEntryPoint()
     {
         int returnVal = 100;
         foo myFoo = getfoo();

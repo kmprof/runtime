@@ -3,15 +3,20 @@
 
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
+using TestLibrary;
 
-public class Test
+public class Test_DevDiv_255294
 {
     static bool f;
 
-    public static int Main()
+    [OuterLoop]
+    [ActiveIssue("https://github.com/dotnet/runtime/issues/44341 The test causes OutOfMemory exception in crossgen mode.", typeof(PlatformDetection), nameof(PlatformDetection.IsWindows), nameof(PlatformDetection.IsX86Process))]
+    [Fact]
+    public static int TestEntryPoint()
     {
         f = true;
-        Test test = new Test();
+        Test_DevDiv_255294 test = new Test_DevDiv_255294();
         return test.HugeMethod();
     }
 

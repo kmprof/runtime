@@ -1,17 +1,22 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_19583;
+
 using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
 using System.Threading;
+using Xunit;
 
 // Check for proper stack spilling in the presence of assignment-like nodes.
 
 public class Program
 {
-    static int Main()
+    [Fact]
+    public static int TestEntryPoint()
     {
         return 100 +
             (Test1.Run() == 0 ? 0 : 1) +
@@ -76,7 +81,7 @@ public class Program
             if (!Sse2.IsSupported) return 0;
 
             vec v = new vec();
-            Vector128<int> o = Vector128.Create(1);
+            Vector128<int> o = Vector128<int>.One;
             int vr16 = v.y;
             Sse2.Store(&v.x, o);
             return vr16;

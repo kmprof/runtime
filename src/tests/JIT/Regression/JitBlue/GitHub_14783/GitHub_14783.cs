@@ -2,15 +2,19 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 
+
+namespace GitHub_14783;
+
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 
 // When the implicit tail call optimization
 // was done inside inlinee with several returns, the compiler created a return spill
 // temp to merge all returns in one return expression and this spill was not expected
 // during the tail call transformation.
 
-class GitHub_14783
+public class GitHub_14783
 {
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static string X(string s)
@@ -69,7 +73,8 @@ class GitHub_14783
         return B(x);
     }
 
-    public static int Main()
+    [Fact]
+    public static int TestEntryPoint()
     {
         string v = A("Hello");
         return v.Length + 95;

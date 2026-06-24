@@ -1,10 +1,14 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace DevDiv_168744;
+
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 
-internal class Program
+public class Program
 {
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static bool Test(ulong i)
@@ -26,7 +30,9 @@ internal class Program
         return res;
     }
 
-    private static int Main()
+    [OuterLoop]
+    [Fact]
+    public static int TestEntryPoint()
     {
         bool res = Program.Test(0x8100000000000000);
 

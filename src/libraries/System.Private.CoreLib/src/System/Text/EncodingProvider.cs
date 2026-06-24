@@ -8,7 +8,7 @@ namespace System.Text
 {
     public abstract class EncodingProvider
     {
-        private static volatile EncodingProvider[]? s_providers;
+        private static EncodingProvider[]? s_providers;
 
         public EncodingProvider() { }
         public abstract Encoding? GetEncoding(string name);
@@ -41,21 +41,18 @@ namespace System.Text
             return enc;
         }
 
-        public virtual IEnumerable<EncodingInfo> GetEncodings() => Array.Empty<EncodingInfo>();
+        public virtual IEnumerable<EncodingInfo> GetEncodings() => [];
 
         internal static void AddProvider(EncodingProvider provider)
         {
-            if (provider is null)
-            {
-                throw new ArgumentNullException(nameof(provider));
-            }
+            ArgumentNullException.ThrowIfNull(provider);
 
             // Few providers are added in a typical app (typically just CodePagesEncodingProvider.Instance), and when they are,
             // they're generally not added concurrently.  So use an optimistic concurrency scheme rather than paying for a lock
             // object allocation on the startup path.
 
             if (s_providers is null &&
-                Interlocked.CompareExchange(ref s_providers, new EncodingProvider[1] { provider }, null) is null)
+                Interlocked.CompareExchange(ref s_providers, [provider], null) is null)
             {
                 return;
             }
@@ -71,7 +68,7 @@ namespace System.Text
 
                 var newProviders = new EncodingProvider[providers.Length + 1];
                 Array.Copy(providers, newProviders, providers.Length);
-                providers[^1] = provider;
+                newProviders[^1] = provider;
 
                 if (Interlocked.CompareExchange(ref s_providers, newProviders, providers) == providers)
                 {
@@ -121,10 +118,10 @@ namespace System.Text
 
         internal static Encoding? GetEncodingFromProvider(string encodingName)
         {
-            if (s_providers == null)
+            EncodingProvider[]? providers = s_providers;
+            if (providers == null)
                 return null;
 
-            EncodingProvider[] providers = s_providers;
             foreach (EncodingProvider provider in providers)
             {
                 Encoding? enc = provider.GetEncoding(encodingName);
@@ -137,10 +134,10 @@ namespace System.Text
 
         internal static Encoding? GetEncodingFromProvider(int codepage, EncoderFallback enc, DecoderFallback dec)
         {
-            if (s_providers == null)
+            EncodingProvider[]? providers = s_providers;
+            if (providers == null)
                 return null;
 
-            EncodingProvider[] providers = s_providers;
             foreach (EncodingProvider provider in providers)
             {
                 Encoding? encoding = provider.GetEncoding(codepage, enc, dec);
@@ -153,10 +150,10 @@ namespace System.Text
 
         internal static Encoding? GetEncodingFromProvider(string encodingName, EncoderFallback enc, DecoderFallback dec)
         {
-            if (s_providers == null)
+            EncodingProvider[]? providers = s_providers;
+            if (providers == null)
                 return null;
 
-            EncodingProvider[] providers = s_providers;
             foreach (EncodingProvider provider in providers)
             {
                 Encoding? encoding = provider.GetEncoding(encodingName, enc, dec);

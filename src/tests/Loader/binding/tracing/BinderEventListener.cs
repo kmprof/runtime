@@ -8,7 +8,7 @@ using System.Linq;
 using System.Threading;
 using System.Reflection;
 
-using TestLibrary;
+using Xunit;
 
 namespace BinderTracingTests
 {
@@ -140,7 +140,7 @@ namespace BinderTracingTests
         public enum PathSource : ushort
         {
             ApplicationAssemblies,
-            AppNativeImagePaths,
+            Unused,
             AppPaths,
             PlatformResourceRoots,
             SatelliteSubdirectory
@@ -158,7 +158,6 @@ namespace BinderTracingTests
 
     internal sealed class BinderEventListener : EventListener
     {
-        private const EventKeywords TasksFlowActivityIds = (EventKeywords)0x80;
         private const EventKeywords AssemblyLoaderKeyword = (EventKeywords)0x4;
 
         private readonly object eventsLock = new object();
@@ -172,10 +171,10 @@ namespace BinderTracingTests
 
         public BindOperation[] WaitAndGetEventsForAssembly(AssemblyName assemblyName)
         {
-            Assert.IsTrue(IsLoadToTrack(assemblyName.Name), $"Waiting for load for untracked name: {assemblyName.Name}. Tracking loads for: {string.Join(", ", loadsToTrack)}");
+            Assert.True(IsLoadToTrack(assemblyName.Name), $"Waiting for load for untracked name: {assemblyName.Name}. Tracking loads for: {string.Join(", ", loadsToTrack)}");
 
             const int waitIntervalInMs = 50;
-            int waitTimeoutInMs = Environment.GetEnvironmentVariable("COMPlus_GCStress") == null
+            int waitTimeoutInMs = Environment.GetEnvironmentVariable("DOTNET_GCStress") == null
                 ? 30 * 1000
                 : int.MaxValue;
 
@@ -191,6 +190,7 @@ namespace BinderTracingTests
                     }
                 }
 
+                Console.WriteLine($"Waiting for bind events for {assemblyName.Name} ({timeWaitedInMs}ms waited) Sleeping for {waitIntervalInMs}ms");
                 Thread.Sleep(waitIntervalInMs);
                 timeWaitedInMs += waitIntervalInMs;
 
@@ -208,10 +208,6 @@ namespace BinderTracingTests
             if (eventSource.Name == "Microsoft-Windows-DotNETRuntime")
             {
                 EnableEvents(eventSource, EventLevel.Verbose, AssemblyLoaderKeyword);
-            }
-            else if (eventSource.Name == "System.Threading.Tasks.TplEventSource")
-            {
-                EnableEvents(eventSource, EventLevel.Verbose, TasksFlowActivityIds);
             }
         }
 
@@ -237,7 +233,7 @@ namespace BinderTracingTests
 
                     lock (eventsLock)
                     {
-                        Assert.IsTrue(!bindOperations.ContainsKey(data.ActivityId), "AssemblyLoadStart should not exist for same activity ID ");
+                        Assert.True(!bindOperations.ContainsKey(data.ActivityId), "AssemblyLoadStart should not exist for same activity ID ");
                         bindOperation.Nested = bindOperations.ContainsKey(data.RelatedActivityId);
                         bindOperations.Add(data.ActivityId, bindOperation);
                         if (bindOperation.Nested)
@@ -400,7 +396,7 @@ namespace BinderTracingTests
                 ParentActivityId = data.RelatedActivityId,
             };
             string requestingAssembly = getDataString("RequestingAssembly");
-            if (!string.IsNullOrEmpty(requestingAssembly))
+            if (!string.IsNullOrEmpty(requestingAssembly) && requestingAssembly != "NULL")
             {
                 bindOperation.RequestingAssembly = new AssemblyName(requestingAssembly);
             }
@@ -420,7 +416,7 @@ namespace BinderTracingTests
                 ErrorMessage = getDataString("ErrorMessage")
             };
             string resultName = getDataString("ResultAssemblyName");
-            if (!string.IsNullOrEmpty(resultName))
+            if (!string.IsNullOrEmpty(resultName) && resultName != "NULL")
             {
                 attempt.ResultAssemblyName = new AssemblyName(resultName);
             }
@@ -438,7 +434,7 @@ namespace BinderTracingTests
                 ResultAssemblyPath = getDataString("ResultAssemblyPath")
             };
             string resultName = getDataString("ResultAssemblyName");
-            if (!string.IsNullOrEmpty(resultName))
+            if (!string.IsNullOrEmpty(resultName) && resultName != "NULL")
             {
                 handlerInvocation.ResultAssemblyName = new AssemblyName(resultName);
             }

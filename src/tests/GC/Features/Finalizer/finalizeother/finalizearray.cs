@@ -5,8 +5,10 @@
 
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
+using TestLibrary;
 
-public class Test 
+public class Test_finalizearray 
 {
     public class Dummy 
     {
@@ -37,7 +39,10 @@ public class Test
         }
     }
 
-    public static int Main() {
+    [ActiveIssue("PlatformDetection.IsPreciseGcSupported false on mono", TestRuntimes.Mono)]
+    [ActiveIssue("https://github.com/dotnet/runtime/issues/54113", typeof(PlatformDetection), nameof(PlatformDetection.IsMonoLLVMAOT))]
+    [Fact]
+    public static int TestEntryPoint() {
         CreateObj temp = new CreateObj();
         temp.RunTest();
 

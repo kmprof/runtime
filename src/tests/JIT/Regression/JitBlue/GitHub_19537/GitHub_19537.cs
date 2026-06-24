@@ -1,10 +1,14 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_19537;
+
 using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Collections.Generic;
+using Xunit;
 
 // Test derived from dotnet/corefx src\System.Numerics.Vectors\src\System\Numerics\Matrix4x4.cs, op_Multiply().
 // This was an ARM32-specific bug for addressing local variables as floats. ARM32 floating-point instructions
@@ -380,7 +384,7 @@ public class Test
                                  M41, M42, M43, M44);
         }
 
-        public static int Main()
+        public static int Run()
         {
             Matrix4x4 m1 = new Matrix4x4(1.0F,2.0F,3.0F,4.0F,
                                          5.0F,6.0F,7.0F,8.0F,
@@ -412,5 +416,14 @@ public class Test
         }
 
     }
-}
 
+    public class GitHub_19537_Test
+    {
+        [OuterLoop]
+        [Fact]
+        public static int TestEntryPoint()
+        {
+            return Matrix4x4.Run();
+        }
+    }
+}

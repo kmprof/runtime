@@ -1,7 +1,11 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace DevDiv_280123;
+
 using System.Runtime.CompilerServices;
+using Xunit;
 
 // This test ensures that the value number store (and its users) behave properly in the event that VN data is requested
 // for trees without value numbers. The original repro was a rather large method with a significant amount of dead code
@@ -10,7 +14,7 @@ using System.Runtime.CompilerServices;
 // assign value numbers to the dead code, but assertion prop still runs over the dead code and attempts to use VN info,
 // which resulted in a number of asserts.
 
-static class C
+public static class C
 {
     [MethodImpl(MethodImplOptions.NoInlining)]
     static int N(ref int i)
@@ -33,9 +37,11 @@ static class C
         return b ? 0 : 1;
     }
 
-    static int Main(string[] args)
+    [OuterLoop]
+    [Fact]
+    public static int TestEntryPoint()
     {
-        int i = args.Length;
+        int i = 0;
         return N(ref i);
     }
 }

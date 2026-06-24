@@ -1,8 +1,12 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_18332;
+
 using System;
 using System.Collections.Generic;
+using Xunit;
 
 internal class Foo : IDisposable
 {
@@ -11,7 +15,7 @@ internal class Foo : IDisposable
     }
 }
 
-class GitHub_18332
+public class GitHub_18332
 {
     // In Aargh there is a finally with two distinct exit paths.
     // Finally cloning may choose the non-fall through ("wibble") exit
@@ -41,7 +45,8 @@ class GitHub_18332
         return "wobble";
     }
     
-    public static int Main(string[] args)
+    [Fact]
+    public static int TestEntryPoint()
     {
         string expected = "wobble";
         string actual = Aargh();

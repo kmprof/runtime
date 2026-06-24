@@ -1,20 +1,25 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_19599;
+
 using System.Runtime.CompilerServices;
 using System.Threading;
+using Xunit;
 
 struct S0
 {
     public byte F0;
 }
 
-class Program
+public class Program
 {
     static S0 s_2;
     static long s_5;
 
-    static int Main()
+    [Fact]
+    public static int TestEntryPoint()
     {
         s_2.F0 = 128;
         M7(s_2);

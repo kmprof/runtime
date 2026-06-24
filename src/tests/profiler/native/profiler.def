@@ -3,5 +3,10 @@ LIBRARY     Profiler.dll
 EXPORTS
             DllGetClassObject       PRIVATE
             DllCanUnloadNow         PRIVATE
-            PassBoolToProfiler      PRIVATE
+            PassCallbackToProfiler  PRIVATE
+            DoPInvoke               PRIVATE
+            DoPInvokeWithCallbackOnOtherThread PRIVATE
+            SwitchJitOptimization   PRIVATE
+            SwitchInlining  PRIVATE
+            GetInlineCount          PRIVATE
 

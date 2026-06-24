@@ -18,9 +18,12 @@
 // pop     {r10,lr}
 // bx      jumpAddress
 
-.assembly extern System.Runtime {}
+.assembly extern System.Runtime { .publickeytoken = (B0 3F 5F 7F 11 D5 0A 3A ) }
 .assembly extern System.Diagnostics.Debug {}
 .assembly GitHub_27678 {}
+.assembly extern xunit.core {}
+.assembly extern Microsoft.DotNet.XUnitExtensions { .publickeytoken = (31 BF 38 56 AD 36 4E 35 ) }
+.assembly extern TestLibrary { .ver 0:0:0:0 }
 
 .class private sequential ansi sealed beforefieldinit AStruct
        extends [System.Runtime]System.ValueType
@@ -76,7 +79,7 @@
   .field public valuetype EStruct d
 } // end of class FStruct
 
-.class private auto ansi beforefieldinit GitHub_27678
+.class public auto ansi beforefieldinit GitHub_27678
        extends [System.Runtime]System.Object
 {
   .method private hidebysig static bool  JumpTarget(int64 a,
@@ -166,6 +169,16 @@
 
   .method public hidebysig static int32  Main() cil managed
   {
+    .custom instance void [xunit.core]Xunit.FactAttribute::.ctor() = {}
+    .custom instance void [Microsoft.DotNet.XUnitExtensions]Xunit.ActiveIssueAttribute::.ctor(string, class [mscorlib]System.Type, string[]) = {
+        string('https://github.com/dotnet/runtime/issues/114908')
+        type([TestLibrary]TestLibrary.PlatformDetection)
+        string[1] ('IsAppleMobile')
+    }
+    .custom instance void [Microsoft.DotNet.XUnitExtensions]Xunit.ActiveIssueAttribute::.ctor(string, valuetype [Microsoft.DotNet.XUnitExtensions]Xunit.TestRuntimes) = {
+        string('Needs triage')
+        int32(0x2) // Mono
+    }
     .entrypoint
     // Code size       62 (0x3e)
     .maxstack  3

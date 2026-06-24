@@ -61,7 +61,7 @@ namespace Microsoft.Extensions.Hosting.IntegrationTesting
 
         private RuntimeFlavor GetRuntimeFlavor(string tfm)
         {
-            if (Tfm.Matches(Tfm.Net461, tfm))
+            if (tfm.ToLowerInvariant().StartsWith("net4"))
             {
                 return RuntimeFlavor.Clr;
             }

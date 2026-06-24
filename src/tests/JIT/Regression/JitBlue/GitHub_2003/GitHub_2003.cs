@@ -5,10 +5,14 @@
 // array of byte vs. an array of structs containing a single byte field.
 // They should generate the same code.
 
+
+namespace GitHub_2003;
+
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 
-class GitHub_2003
+public class GitHub_2003
 {
     static byte[] byteArray;
     struct MyByte
@@ -45,7 +49,8 @@ class GitHub_2003
         }
     }
 
-    static int Main()
+    [Fact]
+    public static int TestEntryPoint()
     {
         byteArray = new byte[100];
         myByteArray = new MyByte[100];

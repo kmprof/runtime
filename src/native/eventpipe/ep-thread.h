@@ -1,10 +1,9 @@
 #ifndef __EVENTPIPE_THREAD_H__
 #define __EVENTPIPE_THREAD_H__
 
-#include <config.h>
+#include "ep-rt-config.h"
 
 #ifdef ENABLE_PERFTRACING
-#include "ep-rt-config.h"
 #include "ep-types.h"
 
 #undef EP_IMPL_GETTER_SETTER
@@ -22,30 +21,52 @@ struct _EventPipeThread {
 #else
 struct _EventPipeThread_Internal {
 #endif
-	// Per-session state.
-	// The pointers in this array are only read/written under rt_lock
-	// Some of the data within the ThreadSessionState object can be accessed
-	// without rt_lock however, see the fields of that type for details.
-	EventPipeThreadSessionState *session_state [EP_MAX_NUMBER_OF_SESSIONS];
+	// An array of slots to hold per-session per-thread state.
+	// A slot in this array should be non-NULL iff the same ThreadSessionState object is also contained in the
+	// session->buffer_manager->thread_session_state_list.
+	//
+	// Thread-safety notes:
+	// The pointers in this array are only modified under the buffer manager lock for whichever enabled session currently owns the slot.
+	// (session->index == slot_index)
+	// Both the per-thread slots here and the global slots in _ep_sessions can only be non-NULL during the time period when the
+	// session is enabled. ep_disable() won't exit the global EP lock until all the slots for that session are NULL and
+	// threads have exited code regions where they may have been using locally cached pointers retrieved through
+	// the slots. This ensures threads neither retain stale pointers to a disabled session, nor will they be able to acquire a
+	// stale pointer from the slot later. It also means no thread will be trying to synchronize using a stale session lock across
+	// the transition when a new session takes over ownership of the slot.
+	//
+	// Writing a non-NULL pointer into the slot only occurs on the OS thread associated with this EventPipeThread object when
+	// trying to write the first event into a session.
+	// Writing a NULL pointer into the slot could occur on either:
+	// 1. The session event flushing thread when is has finished flushing all the events for a thread that already exited.
+	// 2. The thread which calls ep_disable() to disable the session.
+	// 
+	// Reading from this slot can either be done by taking the buffer manager lock, or by doing a volatile read of the pointer. The volatile
+	// read should only occur when running on the OS thread associated with this EventPipeThread object. When reading under the lock the
+	// pointer should not be retained past the scope of the lock. When using the volatile read, the pointer should not be retained
+	// outside the period where session_use_in_progress == slot_number.
+	volatile EventPipeThreadSessionState *session_state [EP_MAX_NUMBER_OF_SESSIONS];
+
 #ifdef EP_THREAD_INCLUDE_ACTIVITY_ID
 	uint8_t activity_id [EP_ACTIVITY_ID_SIZE];
 #endif
 	EventPipeSession *rundown_session;
-	// This lock is designed to have low contention. Normally it is only taken by this thread,
-	// but occasionally it may also be taken by another thread which is trying to collect and drain
-	// buffers from all threads.
-	ep_rt_spin_lock_handle_t rt_lock;
 	// This is initialized when the Thread object is first constructed and remains
 	// immutable afterwards.
 	uint64_t os_thread_id;
 	// The EventPipeThreadHolder maintains one count while the thread is alive
-	// and each session's EventPipeBufferList maintains one count while it
-	// exists.
+	// Each EventPipeThreadSessionState maintains one count throughout its lifetime
+	// Every SequencePoint tracking this thread also maintains one count
 	int32_t ref_count;
 	// If this is set to a valid id before the corresponding entry of sessions is set to null,
 	// that pointer will be protected from deletion. See ep_disable () and
 	// ep_write () for more detail.
-	volatile uint32_t writing_event_in_progress;
+	volatile uint32_t session_use_in_progress;
+	// This is set to non-zero when the thread is unregistered from the global list of EventPipe threads.
+	// This should happen when a physical thread is ending.
+	// This is a convenience marker to prevent us from having to search the global list.
+	// defaults to false.
+	volatile uint32_t unregistered;
 };
 
 #if !defined(EP_INLINE_GETTER_SETTER) && !defined(EP_IMPL_THREAD_GETTER_SETTER)
@@ -68,9 +89,9 @@ ep_thread_get_activity_id_cref (ep_rt_thread_activity_id_handle_t activity_id_ha
 
 EP_DEFINE_GETTER(EventPipeThread *, thread, EventPipeSession *, rundown_session);
 EP_DEFINE_SETTER(EventPipeThread *, thread, EventPipeSession *, rundown_session);
-EP_DEFINE_GETTER_REF(EventPipeThread *, thread, ep_rt_spin_lock_handle_t *, rt_lock);
 EP_DEFINE_GETTER(EventPipeThread *, thread, uint64_t, os_thread_id);
 EP_DEFINE_GETTER_REF(EventPipeThread *, thread, int32_t *, ref_count);
+EP_DEFINE_GETTER_REF(EventPipeThread *, thread, volatile uint32_t *, unregistered);
 
 EventPipeThread *
 ep_thread_alloc (void);
@@ -87,8 +108,11 @@ ep_thread_release (EventPipeThread *thread);
 void
 ep_thread_init (void);
 
-void
-ep_thread_fini (void);
+bool
+ep_thread_register (EventPipeThread *thread);
+
+bool
+ep_thread_unregister (EventPipeThread *thread);
 
 EventPipeThread *
 ep_thread_get (void);
@@ -97,7 +121,7 @@ EventPipeThread *
 ep_thread_get_or_create (void);
 
 void
-ep_thread_get_threads (ep_rt_thread_array_t *threads);
+ep_thread_get_threads (dn_vector_ptr_t *threads);
 
 static
 inline
@@ -106,7 +130,10 @@ ep_thread_create_activity_id (
 	uint8_t *activity_id,
 	uint32_t activity_id_len)
 {
-	ep_rt_create_activity_id (activity_id, activity_id_len);
+	EP_ASSERT (activity_id != NULL);
+	EP_ASSERT (activity_id_len == EP_ACTIVITY_ID_SIZE);
+
+	minipal_guid_v4_create ((GUID *)(activity_id));
 }
 
 static
@@ -159,42 +186,31 @@ ep_thread_is_rundown_thread (const EventPipeThread *thread)
 	return (ep_thread_get_rundown_session (thread) != NULL);
 }
 
-#ifdef EP_CHECKED_BUILD
 void
-ep_thread_requires_lock_held (const EventPipeThread *thread);
-
-void
-ep_thread_requires_lock_not_held (const EventPipeThread *thread);
-#else
-#define ep_thread_requires_lock_held(thread)
-#define ep_thread_requires_lock_not_held(thread)
-#endif
-
-void
-ep_thread_set_session_write_in_progress (
+ep_thread_set_session_use_in_progress (
 	EventPipeThread *thread,
 	uint32_t session_index);
 
 uint32_t
-ep_thread_get_session_write_in_progress (const EventPipeThread *thread);
+ep_thread_get_session_use_in_progress (const EventPipeThread *thread);
 
-// _Requires_lock_held (thread)
-EventPipeThreadSessionState *
-ep_thread_get_or_create_session_state (
-	EventPipeThread *thread,
-	EventPipeSession *session);
-
-// _Requires_lock_held (thread)
+// _Requires_lock_held (buffer_manager)
 EventPipeThreadSessionState *
 ep_thread_get_session_state (
 	const EventPipeThread *thread,
 	EventPipeSession *session);
 
-// _Requires_lock_held (thread)
-void
-ep_thread_delete_session_state (
-	EventPipeThread *thread,
+EventPipeThreadSessionState *
+ep_thread_get_volatile_session_state (
+	const EventPipeThread *thread,
 	EventPipeSession *session);
+
+// _Requires_lock_held (buffer_manager)
+void
+ep_thread_set_session_state (
+	EventPipeThread *thread,
+	EventPipeSession *session,
+	EventPipeThreadSessionState *thread_session_state);
 
 /*
  * EventPipeThreadHolder.
@@ -243,26 +259,25 @@ struct _EventPipeThreadSessionState_Internal {
 	EventPipeThreadHolder thread_holder;
 	// immutable.
 	EventPipeSession *session;
-	// The buffer this thread is allowed to write to if non-null, it must
-	// match the tail of buffer_list
-	// protected by thread_holder->thread.rt_lock
+	// The buffer this thread is allowed to write to. If non-null, it must
+	// match the tail of buffer_list.
+	// Modifications always occur under the buffer manager lock.
+	// Non-null writes only occur on the thread this state belongs to.
+	// Null writes may occur on the buffer manager event flushing thread.
+	// Lock-free reads may occur only on the thread this state belongs to.
 	EventPipeBuffer *write_buffer;
-	// The list of buffers that were written to by this thread. This
-	// is populated lazily the first time a thread tries to allocate
-	// a buffer for this session. It is set back to null when
-	// event writing is suspended during session disable.
-	// protected by the buffer manager lock.
+	// The list of buffers that were written to by this thread.
+	// immutable
 	EventPipeBufferList *buffer_list;
-#ifdef EP_CHECKED_BUILD
-	// protected by the buffer manager lock.
-	EventPipeBufferManager *buffer_manager;
-#endif
+	// The sequence number of the last event that was read, only
+	// updated/read by the reader thread.
+	uint32_t last_read_sequence_number;
 	// The number of events that were attempted to be written by this
-	// thread. Each event was either succesfully recorded in a buffer
+	// thread. Each event was either successfully recorded in a buffer
 	// or it was dropped.
 	//
-	// Only updated by the current thread under thread_holder->thread.rt_lock. Other
-	// event writer threads are allowed to do unsychronized reads when
+	// Only updated by the current thread.
+	// Other event writer threads are allowed to do unsynchronized reads when
 	// capturing a sequence point but this does not provide any consistency
 	// guarantee. In particular there is no promise that the other thread
 	// is observing the most recent sequence number, nor is there a promise
@@ -271,9 +286,9 @@ struct _EventPipeThreadSessionState_Internal {
 	// number in tandem with an event write or drop, but without a write
 	// barrier between those memory writes they might observed out-of-order
 	// by the thread capturing the sequence point. The only utility this
-	// unsychronized read has is that if some other thread observes a sequence
+	// unsynchronized read has is that if some other thread observes a sequence
 	// number X, it knows this thread must have attempted to write at least
-	// X events prior to the moment in time when the read occured. If the event
+	// X events prior to the moment in time when the read occurred. If the event
 	// buffers are later read and there are fewer than X events timestamped
 	// prior to the sequence point we can be certain the others were dropped.
 	volatile uint32_t sequence_number;
@@ -285,8 +300,10 @@ struct _EventPipeThreadSessionState {
 };
 #endif
 
-EP_DEFINE_GETTER_REF(EventPipeThreadSessionState *, thread_session_state, EventPipeThreadHolder *, thread_holder)
+EP_DEFINE_GETTER(EventPipeThreadSessionState *, thread_session_state, EventPipeBufferList *, buffer_list)
 EP_DEFINE_GETTER(EventPipeThreadSessionState *, thread_session_state, EventPipeSession *, session)
+EP_DEFINE_GETTER(EventPipeThreadSessionState *, thread_session_state, uint32_t, last_read_sequence_number);
+EP_DEFINE_SETTER(EventPipeThreadSessionState *, thread_session_state, uint32_t, last_read_sequence_number);
 
 EventPipeThreadSessionState *
 ep_thread_session_state_alloc (
@@ -300,34 +317,25 @@ ep_thread_session_state_free (EventPipeThreadSessionState *thread_session_state)
 EventPipeThread *
 ep_thread_session_state_get_thread (const EventPipeThreadSessionState *thread_session_state);
 
-// _Requires_lock_held (thread)
+uint32_t
+ep_thread_session_state_get_buffer_count_estimate(const EventPipeThreadSessionState *thread_session_state);
+
+// _Requires_lock_held (buffer_manager)
 EventPipeBuffer *
 ep_thread_session_state_get_write_buffer (const EventPipeThreadSessionState *thread_session_state);
 
-// _Requires_lock_held (thread)
+EventPipeBuffer *
+ep_thread_session_state_get_volatile_write_buffer (const EventPipeThreadSessionState *thread_session_state);
+
+// _Requires_lock_held (buffer_manager)
 void
 ep_thread_session_state_set_write_buffer (
 	EventPipeThreadSessionState *thread_session_state,
 	EventPipeBuffer *new_buffer);
 
-// _Requires_lock_held (buffer_manager)
-EventPipeBufferList *
-ep_thread_session_state_get_buffer_list (const EventPipeThreadSessionState *thread_session_state);
-
-// _Requires_lock_held (buffer_manager)
-void
-ep_thread_session_state_set_buffer_list (
-	EventPipeThreadSessionState *thread_session_state,
-	EventPipeBufferList *new_buffer_list);
-
 uint32_t
 ep_thread_session_state_get_volatile_sequence_number (const EventPipeThreadSessionState *thread_session_state);
 
-// _Requires_lock_held (thread)
-uint32_t
-ep_thread_session_state_get_sequence_number (const EventPipeThreadSessionState *thread_session_state);
-
-// _Requires_lock_held (thread)
 void
 ep_thread_session_state_increment_sequence_number (EventPipeThreadSessionState *thread_session_state);
 

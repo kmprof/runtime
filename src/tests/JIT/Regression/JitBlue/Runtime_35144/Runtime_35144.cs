@@ -6,9 +6,13 @@
 // that the ABI is correctly implemented, but this test is here to enable
 // these cases to be manually verified (and diffed).
 //
+
+namespace Runtime_35144;
+
 using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
+using Xunit;
 
 #pragma warning disable 0169 // warning CS0169: The field '{0}' is never used
 struct WrappedVector64  { Vector64<byte> _; }
@@ -27,7 +31,7 @@ struct S2 { WrappedVector64 x; double y; }
 // Should be passed by reference as non-HFA.
 struct S3 { Vector128<byte> x; WrappedVector256 y; }
 
-static class Runtime_35144
+public static class Runtime_35144
 {
     [MethodImpl(MethodImplOptions.NoInlining)]
     static void Foo<T>(T x, object o)
@@ -43,7 +47,8 @@ static class Runtime_35144
         if (((string)o) != "SomeString") throw new Exception();
     }
 
-    static int Main()
+    [Fact]
+    public static int TestEntryPoint()
     {
         int returnVal = 100;
         try

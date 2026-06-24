@@ -3,7 +3,9 @@
 
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography.SLHDsa.Tests;
 using System.Security.Cryptography.X509Certificates;
+using Microsoft.DotNet.XUnitExtensions;
 using Test.Cryptography;
 using Xunit;
 
@@ -100,7 +102,7 @@ namespace System.Security.Cryptography.Pkcs.Tests
                 Assert.NotSame(counterSigner.Certificate, counterSigner2.Certificate);
                 Assert.Equal(counterSigner.Certificate, counterSigner2.Certificate);
 
-#if NETCOREAPP
+#if NET
                 byte[] signature = counterSigner.GetSignature();
                 byte[] signature2 = counterSigner2.GetSignature();
 
@@ -110,7 +112,7 @@ namespace System.Security.Cryptography.Pkcs.Tests
             }
         }
 
-#if NETCOREAPP
+#if NET
         [Fact]
         public static void SignerInfo_GetSignature_UniquePerCall()
         {
@@ -139,7 +141,7 @@ namespace System.Security.Cryptography.Pkcs.Tests
             Assert.NotSame(oid, oid2);
         }
 
-#if NETCOREAPP
+#if NET
         [Fact]
         public static void SignerInfo_SignatureAlgorithm_NotSame()
         {
@@ -183,7 +185,7 @@ namespace System.Security.Cryptography.Pkcs.Tests
                 () => signer.CheckSignature(null, false));
         }
 
-        [Fact]
+        [ConditionalFact(typeof(SignatureSupport), nameof(SignatureSupport.SupportsRsaSha1Signatures))]
         public static void CheckSignature_ExtraStore_IsAdditional()
         {
             SignedCms cms = new SignedCms();
@@ -198,7 +200,7 @@ namespace System.Security.Cryptography.Pkcs.Tests
             signer.CheckSignature(new X509Certificate2Collection(), true);
         }
 
-        [Fact]
+        [ConditionalFact(typeof(SignatureSupport), nameof(SignatureSupport.SupportsRsaMd5Signatures))]
         public static void CheckSignature_MD5WithRSA()
         {
             SignedCms cms = new SignedCms();
@@ -212,7 +214,7 @@ namespace System.Security.Cryptography.Pkcs.Tests
             signer.CheckSignature(true);
         }
 
-        [Fact]
+        [ConditionalFact(typeof(SignatureSupport), nameof(SignatureSupport.SupportsRsaSha1Signatures))]
         public static void CheckSignature_SHA1WithRSA()
         {
             SignedCms cms = new SignedCms();
@@ -296,7 +298,7 @@ namespace System.Security.Cryptography.Pkcs.Tests
             signer.CheckSignature(true);
         }
 
-        [Fact]
+        [ConditionalFact(typeof(SignatureSupport), nameof(SignatureSupport.SupportsRsaSha1Signatures))]
         [SkipOnTargetFramework(TargetFrameworkMonikers.NetFramework, "NetFx bug in matching logic")]
         public static void RemoveCounterSignature_MatchesIssuerAndSerialNumber()
         {
@@ -327,7 +329,7 @@ namespace System.Security.Cryptography.Pkcs.Tests
             cms.CheckHash();
         }
 
-        [Fact]
+        [ConditionalFact(typeof(SignatureSupport), nameof(SignatureSupport.SupportsRsaSha1Signatures))]
         [SkipOnTargetFramework(TargetFrameworkMonikers.NetFramework, "NetFx bug in matching logic")]
         public static void RemoveCounterSignature_MatchesSubjectKeyIdentifier()
         {
@@ -360,7 +362,7 @@ namespace System.Security.Cryptography.Pkcs.Tests
             cms.CheckHash();
         }
 
-        [Fact]
+        [ConditionalFact(typeof(SignatureSupport), nameof(SignatureSupport.SupportsRsaSha1Signatures))]
         [SkipOnTargetFramework(TargetFrameworkMonikers.NetFramework, "NetFx bug in matching logic")]
         public static void RemoveCounterSignature_MatchesNoSignature()
         {
@@ -392,7 +394,7 @@ namespace System.Security.Cryptography.Pkcs.Tests
             cms.CheckSignature(true);
         }
 
-        [Fact]
+        [ConditionalFact(typeof(SignatureSupport), nameof(SignatureSupport.SupportsRsaSha1Signatures))]
         [SkipOnTargetFramework(TargetFrameworkMonikers.NetFramework, "NetFx bug in matching logic")]
         public static void RemoveCounterSignature_UsesLiveState()
         {
@@ -440,7 +442,7 @@ namespace System.Security.Cryptography.Pkcs.Tests
                 () => signerInfo.RemoveCounterSignature(signerInfo));
         }
 
-        [Theory]
+        [ConditionalTheory(typeof(PlatformSupport), nameof(PlatformSupport.IsDSASupported))]
         [InlineData(0)]
         [InlineData(1)]
         [SkipOnTargetFramework(TargetFrameworkMonikers.NetFramework, "NetFx bug")]
@@ -528,7 +530,7 @@ namespace System.Security.Cryptography.Pkcs.Tests
             SignerInfo signer = cms.SignerInfos[0];
             SignerInfo counterSigner = signer.CounterSignerInfos[1];
 
-            // This succeeeds, but reduces the real count to 1.
+            // This succeeds, but reduces the real count to 1.
             signer.RemoveCounterSignature(counterSigner);
             Assert.Equal(2, signer.CounterSignerInfos.Count);
             Assert.Single(cms.SignerInfos[0].CounterSignerInfos);
@@ -566,7 +568,7 @@ namespace System.Security.Cryptography.Pkcs.Tests
                 () => signer.RemoveCounterSignature(0));
         }
 
-        [Fact]
+        [ConditionalFact(typeof(SignatureSupport), nameof(SignatureSupport.SupportsRsaSha1Signatures))]
         public static void AddCounterSigner_DuplicateCert_RSA()
         {
             SignedCms cms = new SignedCms();
@@ -612,51 +614,27 @@ namespace System.Security.Cryptography.Pkcs.Tests
             cms.CheckSignature(true);
         }
 
-        [Theory]
+        [ConditionalTheory(typeof(SignatureSupport), nameof(SignatureSupport.SupportsRsaSha1Signatures))]
         [InlineData(SubjectIdentifierType.IssuerAndSerialNumber)]
         [InlineData(SubjectIdentifierType.SubjectKeyIdentifier)]
         public static void AddCounterSigner_RSA(SubjectIdentifierType identifierType)
         {
-            SignedCms cms = new SignedCms();
-            cms.Decode(SignedDocuments.RsaPkcs1OneSignerIssuerAndSerialNumber);
-            Assert.Single(cms.Certificates);
-
-            SignerInfo firstSigner = cms.SignerInfos[0];
-            Assert.Empty(firstSigner.CounterSignerInfos);
-            Assert.Empty(firstSigner.UnsignedAttributes);
-
-            using (X509Certificate2 signerCert = Certificates.RSA2048SignatureOnly.TryGetCertificateWithPrivateKey())
-            {
-                CmsSigner signer = new CmsSigner(identifierType, signerCert);
-                firstSigner.ComputeCounterSignature(signer);
-            }
-
-            Assert.Empty(firstSigner.CounterSignerInfos);
-            Assert.Empty(firstSigner.UnsignedAttributes);
-
-            SignerInfo firstSigner2 = cms.SignerInfos[0];
-            Assert.Single(firstSigner2.CounterSignerInfos);
-            Assert.Single(firstSigner2.UnsignedAttributes);
-
-            SignerInfo counterSigner = firstSigner2.CounterSignerInfos[0];
-
-            Assert.Equal(identifierType, counterSigner.SignerIdentifier.Type);
-
-            // On .NET Framework there will be two attributes, because Windows emits the
-            // content-type attribute even for counter-signers.
-            int expectedCount = 1;
-#if NETFRAMEWORK
-            expectedCount = 2;
-#endif
-            Assert.Equal(expectedCount, counterSigner.SignedAttributes.Count);
-            Assert.Equal(Oids.MessageDigest, counterSigner.SignedAttributes[expectedCount - 1].Oid.Value);
-
-            Assert.NotEqual(firstSigner2.Certificate, counterSigner.Certificate);
-            Assert.Equal(2, cms.Certificates.Count);
-
-            counterSigner.CheckSignature(true);
-            firstSigner2.CheckSignature(true);
-            cms.CheckSignature(true);
+            AssertAddCounterSigner(
+                identifierType,
+                signer =>
+                {
+                    using (X509Certificate2 signerCert = Certificates.RSA2048SignatureOnly.TryGetCertificateWithPrivateKey())
+                    {
+                        CmsSigner counterSigner = new CmsSigner(identifierType, signerCert);
+                        signer.ComputeCounterSignature(counterSigner);
+                    }
+                },
+                (cms, counterSigner) =>
+                {
+                    counterSigner.CheckSignature(true);
+                    cms.SignerInfos[0].CheckSignature(true);
+                    cms.CheckSignature(true);
+                });
         }
 
         [Fact]
@@ -697,66 +675,44 @@ namespace System.Security.Cryptography.Pkcs.Tests
             cms.CheckSignature(true);
         }
 
-        [Fact]
+        [ConditionalFact(typeof(SignatureSupport), nameof(SignatureSupport.SupportsRsaSha1Signatures))]
         public static void AddCounterSigner_DSA()
         {
-            SignedCms cms = new SignedCms();
-            cms.Decode(SignedDocuments.RsaPkcs1OneSignerIssuerAndSerialNumber);
-            Assert.Single(cms.Certificates);
-
-            SignerInfo firstSigner = cms.SignerInfos[0];
-            Assert.Empty(firstSigner.CounterSignerInfos);
-            Assert.Empty(firstSigner.UnsignedAttributes);
-
-            using (X509Certificate2 signerCert = Certificates.Dsa1024.TryGetCertificateWithPrivateKey())
+            if (!PlatformSupport.IsDSASupported)
             {
-                CmsSigner signer = new CmsSigner(SubjectIdentifierType.IssuerAndSerialNumber, signerCert);
-                signer.IncludeOption = X509IncludeOption.EndCertOnly;
-                // Best compatibility for DSA is SHA-1 (FIPS 186-2)
-                signer.DigestAlgorithm = new Oid(Oids.Sha1, Oids.Sha1);
-                firstSigner.ComputeCounterSignature(signer);
+                throw new SkipTestException("Platform does not support DSA.");
             }
 
-            Assert.Empty(firstSigner.CounterSignerInfos);
-            Assert.Empty(firstSigner.UnsignedAttributes);
-
-            SignerInfo firstSigner2 = cms.SignerInfos[0];
-            Assert.Single(firstSigner2.CounterSignerInfos);
-            Assert.Single(firstSigner2.UnsignedAttributes);
-
-            Assert.Single(cms.SignerInfos);
-            Assert.Equal(2, cms.Certificates.Count);
-
-            SignerInfo counterSigner = firstSigner2.CounterSignerInfos[0];
-
-            Assert.Equal(1, counterSigner.Version);
-
-            // On .NET Framework there will be two attributes, because Windows emits the
-            // content-type attribute even for counter-signers.
-            int expectedCount = 1;
-#if NETFRAMEWORK
-            expectedCount = 2;
-#endif
-            Assert.Equal(expectedCount, counterSigner.SignedAttributes.Count);
-            Assert.Equal(Oids.MessageDigest, counterSigner.SignedAttributes[expectedCount - 1].Oid.Value);
-
-            Assert.NotEqual(firstSigner2.Certificate, counterSigner.Certificate);
-            Assert.Equal(2, cms.Certificates.Count);
-
-#if NETCOREAPP
-            byte[] signature = counterSigner.GetSignature();
-            Assert.NotEmpty(signature);
-            // DSA PKIX signature format is a DER SEQUENCE.
-            Assert.Equal(0x30, signature[0]);
+            AssertAddCounterSigner(
+                SubjectIdentifierType.IssuerAndSerialNumber,
+                signer =>
+                {
+                    using (X509Certificate2 signerCert = Certificates.Dsa1024.TryGetCertificateWithPrivateKey())
+                    {
+                        CmsSigner counterSigner = new CmsSigner(SubjectIdentifierType.IssuerAndSerialNumber, signerCert);
+                        counterSigner.IncludeOption = X509IncludeOption.EndCertOnly;
+                        // Best compatibility for DSA is SHA-1 (FIPS 186-2)
+                        counterSigner.DigestAlgorithm = new Oid(Oids.Sha1, Oids.Sha1);
+                        signer.ComputeCounterSignature(counterSigner);
+                    }
+                },
+                (cms, counterSigner) =>
+                {
+#if NET
+                    byte[] signature = counterSigner.GetSignature();
+                    Assert.NotEmpty(signature);
+                    // DSA PKIX signature format is a DER SEQUENCE.
+                    Assert.Equal(0x30, signature[0]);
 #endif
 
-            cms.CheckSignature(true);
-            byte[] encoded = cms.Encode();
-            cms.Decode(encoded);
-            cms.CheckSignature(true);
+                    cms.CheckSignature(true);
+                    byte[] encoded = cms.Encode();
+                    cms.Decode(encoded);
+                    cms.CheckSignature(true);
+                });
         }
 
-        [Theory]
+        [ConditionalTheory(typeof(SignatureSupport), nameof(SignatureSupport.SupportsRsaSha1Signatures))]
         [SkipOnTargetFramework(TargetFrameworkMonikers.NetFramework)]
         [InlineData(SubjectIdentifierType.IssuerAndSerialNumber, Oids.Sha1)]
         [InlineData(SubjectIdentifierType.SubjectKeyIdentifier, Oids.Sha1)]
@@ -768,6 +724,136 @@ namespace System.Security.Cryptography.Pkcs.Tests
         [InlineData(SubjectIdentifierType.SubjectKeyIdentifier, Oids.Sha512)]
         public static void AddCounterSigner_ECDSA(SubjectIdentifierType identifierType, string digestOid)
         {
+            AssertAddCounterSigner(
+                identifierType,
+                signer =>
+                {
+                    using (X509Certificate2 signerCert = Certificates.ECDsaP256Win.TryGetCertificateWithPrivateKey())
+                    {
+                        CmsSigner counterSigner = new CmsSigner(identifierType, signerCert);
+                        counterSigner.IncludeOption = X509IncludeOption.EndCertOnly;
+                        counterSigner.DigestAlgorithm = new Oid(digestOid, digestOid);
+                        signer.ComputeCounterSignature(counterSigner);
+                    }
+                },
+                (cms, counterSigner) =>
+                {
+#if NET
+                    byte[] signature = counterSigner.GetSignature();
+                    Assert.NotEmpty(signature);
+                    // DSA PKIX signature format is a DER SEQUENCE.
+                    Assert.Equal(0x30, signature[0]);
+
+                    // ECDSA Oids are all under 1.2.840.10045.4.
+                    Assert.StartsWith("1.2.840.10045.4.", counterSigner.SignatureAlgorithm.Value);
+#endif
+
+                    cms.CheckSignature(true);
+                    byte[] encoded = cms.Encode();
+                    cms.Decode(encoded);
+                    cms.CheckSignature(true);
+                });
+        }
+
+        public static IEnumerable<object[]> AddCounterSignerSlhDsaTestData =>
+            from sit in new[] { SubjectIdentifierType.IssuerAndSerialNumber, SubjectIdentifierType.SubjectKeyIdentifier }
+            from algorithms in new (SlhDsaAlgorithm signAlgorithm, string hashAlgorithm)[]
+            {
+                (SlhDsaAlgorithm.SlhDsaSha2_128s, Oids.Sha256),
+                (SlhDsaAlgorithm.SlhDsaShake128f, Oids.Shake128),
+                (SlhDsaAlgorithm.SlhDsaSha2_256f, Oids.Sha512),
+                (SlhDsaAlgorithm.SlhDsaShake256f, Oids.Shake256),
+            }
+            from SlhDsaTestData.SlhDsaGeneratedKeyInfo info in SlhDsaTestData.GeneratedKeyInfosRaw
+            where info.Algorithm == algorithms.signAlgorithm // Find the matching test data for the algorithm
+            select new object[] { sit, algorithms.hashAlgorithm, info };
+
+        public static bool SlhDsaAndRsaSha1SignaturesSupported =>
+            SignatureSupport.SupportsRsaSha1Signatures && SlhDsa.IsSupported;
+
+        [ConditionalTheory(typeof(SignerInfoTests), nameof(SlhDsaAndRsaSha1SignaturesSupported))]
+        [MemberData(nameof(AddCounterSignerSlhDsaTestData))]
+        public static void AddCounterSigner_SlhDsa(SubjectIdentifierType identifierType, string digestOid, SlhDsaTestData.SlhDsaGeneratedKeyInfo info)
+        {
+            AssertAddCounterSigner(
+                identifierType,
+                signer =>
+                {
+                    CertLoader loader = Certificates.SlhDsaGeneratedCerts.Single(cert => cert.CerData.SequenceEqual(info.Certificate));
+                    using (X509Certificate2 signerCert = loader.TryGetCertificateWithPrivateKey())
+                    {
+                        CmsSigner counterSigner = new CmsSigner(identifierType, signerCert);
+                        counterSigner.IncludeOption = X509IncludeOption.EndCertOnly;
+                        counterSigner.DigestAlgorithm = new Oid(digestOid, digestOid);
+                        signer.ComputeCounterSignature(counterSigner);
+                    }
+                },
+                (cms, counterSigner) =>
+                {
+                    byte[] signature = counterSigner.GetSignature();
+                    Assert.NotEmpty(signature);
+
+                    // SLH-DSA Oids are all under 2.16.840.1.101.3.4.3.
+                    Assert.StartsWith("2.16.840.1.101.3.4.3.", counterSigner.SignatureAlgorithm.Value);
+
+                    cms.CheckSignature(true);
+                    byte[] encoded = cms.Encode();
+                    cms.Decode(encoded);
+                    cms.CheckSignature(true);
+                });
+        }
+
+        public static IEnumerable<object[]> AddCounterSignerMLDsaTestData =>
+            from sit in new[] { SubjectIdentifierType.IssuerAndSerialNumber, SubjectIdentifierType.SubjectKeyIdentifier }
+            from data in new (MLDsaAlgorithm algorithm, string hashAlgorithm)[]
+            {
+                (MLDsaAlgorithm.MLDsa44, Oids.Shake128),
+                (MLDsaAlgorithm.MLDsa65, Oids.Sha512),
+                (MLDsaAlgorithm.MLDsa87, Oids.Shake256),
+            }
+            select new object[] { sit, data.hashAlgorithm, data.algorithm };
+
+        // TODO: Windows does not support draft 10 PKCS#8 format yet. Remove this and use MLDsa.IsSupported when it does.
+        private static bool SupportsDraft10Pkcs8 => MLDsa.IsSupported && !PlatformDetection.IsWindows;
+
+        public static bool MLDsaAndRsaSha1SignaturesSupported => SignatureSupport.SupportsRsaSha1Signatures && SupportsDraft10Pkcs8;
+
+        [ConditionalTheory(typeof(SignerInfoTests), nameof(MLDsaAndRsaSha1SignaturesSupported))]
+        [MemberData(nameof(AddCounterSignerMLDsaTestData))]
+        public static void AddCounterSigner_MLDsa(SubjectIdentifierType identifierType, string digestOid, MLDsaAlgorithm algorithm)
+        {
+            AssertAddCounterSigner(
+                identifierType,
+                signer =>
+                {
+                    using (X509Certificate2 signerCert = Certificates.MLDsaIetf[algorithm].TryGetCertificateWithPrivateKey())
+                    {
+                        CmsSigner counterSigner = new CmsSigner(identifierType, signerCert);
+                        counterSigner.IncludeOption = X509IncludeOption.EndCertOnly;
+                        counterSigner.DigestAlgorithm = new Oid(digestOid, digestOid);
+                        signer.ComputeCounterSignature(counterSigner);
+                    }
+                },
+                (cms, counterSigner) =>
+                {
+                    byte[] signature = counterSigner.GetSignature();
+                    Assert.NotEmpty(signature);
+
+                    // ML-DSA Oids are all under 2.16.840.1.101.3.4.3.
+                    Assert.StartsWith("2.16.840.1.101.3.4.3.", counterSigner.SignatureAlgorithm.Value);
+
+                    cms.CheckSignature(true);
+                    byte[] encoded = cms.Encode();
+                    cms.Decode(encoded);
+                    cms.CheckSignature(true);
+                });
+        }
+
+        private static void AssertAddCounterSigner(
+            SubjectIdentifierType identifierType,
+            Action<SignerInfo> counterSignSigner,
+            Action<SignedCms, SignerInfo> assertCounterSigner)
+        {
             SignedCms cms = new SignedCms();
             cms.Decode(SignedDocuments.RsaPkcs1OneSignerIssuerAndSerialNumber);
             Assert.Single(cms.Certificates);
@@ -776,13 +862,7 @@ namespace System.Security.Cryptography.Pkcs.Tests
             Assert.Empty(firstSigner.CounterSignerInfos);
             Assert.Empty(firstSigner.UnsignedAttributes);
 
-            using (X509Certificate2 signerCert = Certificates.ECDsaP256Win.TryGetCertificateWithPrivateKey())
-            {
-                CmsSigner signer = new CmsSigner(identifierType, signerCert);
-                signer.IncludeOption = X509IncludeOption.EndCertOnly;
-                signer.DigestAlgorithm = new Oid(digestOid, digestOid);
-                firstSigner.ComputeCounterSignature(signer);
-            }
+            counterSignSigner(firstSigner);
 
             Assert.Empty(firstSigner.CounterSignerInfos);
             Assert.Empty(firstSigner.UnsignedAttributes);
@@ -811,23 +891,10 @@ namespace System.Security.Cryptography.Pkcs.Tests
             Assert.NotEqual(firstSigner2.Certificate, counterSigner.Certificate);
             Assert.Equal(2, cms.Certificates.Count);
 
-#if NETCOREAPP
-            byte[] signature = counterSigner.GetSignature();
-            Assert.NotEmpty(signature);
-            // DSA PKIX signature format is a DER SEQUENCE.
-            Assert.Equal(0x30, signature[0]);
-
-            // ECDSA Oids are all under 1.2.840.10045.4.
-            Assert.StartsWith("1.2.840.10045.4.", counterSigner.SignatureAlgorithm.Value);
-#endif
-
-            cms.CheckSignature(true);
-            byte[] encoded = cms.Encode();
-            cms.Decode(encoded);
-            cms.CheckSignature(true);
+            assertCounterSigner(cms, counterSigner);
         }
 
-        [Fact]
+        [ConditionalFact(typeof(SignatureSupport), nameof(SignatureSupport.SupportsRsaSha1Signatures))]
         public static void AddFirstCounterSigner_NoSignature_NoPrivateKey()
         {
             SignedCms cms = new SignedCms();
@@ -860,7 +927,7 @@ namespace System.Security.Cryptography.Pkcs.Tests
             }
         }
 
-        [Fact]
+        [ConditionalFact(typeof(SignatureSupport), nameof(SignatureSupport.SupportsRsaSha1Signatures))]
         public static void AddFirstCounterSigner_NoSignature()
         {
             SignedCms cms = new SignedCms();
@@ -910,7 +977,7 @@ namespace System.Security.Cryptography.Pkcs.Tests
             }
         }
 
-        [Theory]
+        [ConditionalTheory(typeof(SignatureSupport), nameof(SignatureSupport.SupportsRsaSha1Signatures))]
         [InlineData(false)]
         [InlineData(true)]
         public static void AddSecondCounterSignature_NoSignature_WithCert(bool addExtraCert)
@@ -918,7 +985,7 @@ namespace System.Security.Cryptography.Pkcs.Tests
             AddSecondCounterSignature_NoSignature(withCertificate: true, addExtraCert);
         }
 
-        [Theory]
+        [ConditionalTheory(typeof(SignatureSupport), nameof(SignatureSupport.SupportsRsaSha1Signatures))]
         // On .NET Framework it will prompt for the counter-signer's certificate if it's null,
         // even if the signature type is NoSignature, so don't run the test there.
         [SkipOnTargetFramework(TargetFrameworkMonikers.NetFramework)]
@@ -1027,7 +1094,16 @@ namespace System.Security.Cryptography.Pkcs.Tests
         public static void EnsureExtraCertsAdded()
         {
             SignedCms cms = new SignedCms();
-            cms.Decode(SignedDocuments.OneDsa1024);
+
+            // DSA is not supported, so use ECDsa signed document instead
+            if (!PlatformSupport.IsDSASupported)
+            {
+                cms.Decode(SignedDocuments.SHA256ECDSAWithRsaSha256DigestIdentifier);
+            }
+            else
+            {
+                cms.Decode(SignedDocuments.OneDsa1024);
+            }
 
             int preCount = cms.Certificates.Count;
 

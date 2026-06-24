@@ -1,7 +1,7 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-// The test exposed a bug in CORINFO_HELP_ASSIGN_BYREF GC kill set on Unix x64.
+// The test exposed a bug in the GC write barrier kill set on Unix x64
 // that caused segfault.
 
 using System;
@@ -10,6 +10,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
+using Xunit;
 
 namespace Repro
 {
@@ -57,9 +58,17 @@ namespace Repro
         }
     }
 
-    class Program
+    public class Program
     {
-        static readonly Random Rng = new Random(38237);
+        public const int DefaultSeed = 20010415;
+        public static int Seed = Environment.GetEnvironmentVariable("CORECLR_SEED") switch
+        {
+            string seedStr when seedStr.Equals("random", StringComparison.OrdinalIgnoreCase) => new Random().Next(),
+            string seedStr when int.TryParse(seedStr, out int envSeed) => envSeed,
+            _ => DefaultSeed
+        };
+
+        static readonly Random Rng = new Random(Seed);
 
         public static List<CompositeSource> GetCompositeSources()
         {
@@ -84,7 +93,9 @@ namespace Repro
             return list;
         }
 
-        static int Main()
+        [OuterLoop]
+        [Fact]
+        public static int TestEntryPoint()
         {
             Console.WriteLine("Starting stress loop");
             var compositeSources = GetCompositeSources();

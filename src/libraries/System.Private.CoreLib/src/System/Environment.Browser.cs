@@ -25,6 +25,8 @@ namespace System
             return new OperatingSystem(PlatformID.Other, new Version(1, 0, 0, 0));
         }
 
+        private static bool IsPrivilegedProcessCore() => false;
+
         private static int GetProcessId() => 42;
 
         /// <summary>
@@ -32,5 +34,11 @@ namespace System
         /// </summary>
         /// <returns>Path of the executable that started the currently executing process</returns>
         private static string? GetProcessPath() => null;
+
+#if !MONO
+        // This is only used for delegate created from native host
+        private static string[] GetCommandLineArgsNative() => [];
+#endif
+
     }
 }

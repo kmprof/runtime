@@ -3,10 +3,15 @@
 
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
+using TestLibrary;
 
-class C
+public class C
 {
-    public static int Main(string[] args)
+    [Fact]
+    [ActiveIssue("https://github.com/dotnet/runtime/issues/114908", typeof(PlatformDetection), nameof(PlatformDetection.IsAppleMobile))]
+    [SkipOnMono("needs triage")]
+    public static int TestEntryPoint()
     {
         int error = Test1();
         error += Test2();

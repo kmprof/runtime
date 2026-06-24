@@ -6,11 +6,13 @@ using System.IO;
 using System.Xml;
 using System.Xml.XPath;
 using System.Xml.Xsl;
+using Xunit;
+using TestLibrary;
 
 
 namespace XSLTest
 {
-    class Program
+    public class Program
     {
         // In this test a dynamic method with tail-prefixed call is created.
         // One of the locals is not explicitly initialized but a flag to init locals is set.
@@ -18,7 +20,12 @@ namespace XSLTest
         // The jit performs an optimization transforming the tail call into a loop.
         // The bug was that the local was only zero-initialized for the first iteration of the loop.
 
-        static int Main(string[] args)
+        [ActiveIssue("https://github.com/dotnet/runtimelab/issues/155: Reflection emit", typeof(Utilities), nameof(Utilities.IsNativeAot))]
+        [ActiveIssue("needs triage", typeof(PlatformDetection), nameof(PlatformDetection.IsMonoInterpreter))]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/53353", TestPlatforms.Android)]
+        [ActiveIssue("needs triage", TestPlatforms.iOS | TestPlatforms.tvOS | TestPlatforms.MacCatalyst)]
+        [Fact]
+        public static int TestEntryPoint()
         {
             string inputXml = "Input.xml";
             string inputXsl = "Transform.xsl";

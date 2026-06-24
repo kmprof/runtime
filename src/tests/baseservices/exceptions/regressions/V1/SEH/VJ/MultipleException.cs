@@ -3,6 +3,7 @@
 using System;
 using System.Threading;
 using System.IO;
+using Xunit;
 
 class UserException : Exception {
 	internal int ExceptionId;
@@ -15,12 +16,15 @@ class UserException : Exception {
 public class MultipleException {
 	private int ThreadId;
 
-	public MultipleException(int id){
+	public MultipleException() { }
+
+	private MultipleException(int id){
 		ThreadId = id;
 	}
 		
 	
-	public static int Main(String [] args) {
+	[Fact]
+	public static int TestEntryPoint() {
 		int retVal = 100;
 		String s = "Done";
 		Thread mv_Thread;

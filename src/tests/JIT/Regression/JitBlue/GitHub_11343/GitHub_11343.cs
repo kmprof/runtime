@@ -1,10 +1,14 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_11343;
+
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 
-class GitHub_11343
+public class GitHub_11343
 {
     const int Passed = 100;
     const int Failed = 0;
@@ -17,7 +21,8 @@ class GitHub_11343
         int unused = s.Length;
     }
 
-    static int Main()
+    [Fact]
+    public static int TestEntryPoint()
     {
         try
         {

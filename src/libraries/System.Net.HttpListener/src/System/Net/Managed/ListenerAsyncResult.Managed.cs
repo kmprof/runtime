@@ -31,21 +31,22 @@
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
+using System.Net.Sockets;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 
 namespace System.Net
 {
-    internal class ListenerAsyncResult : IAsyncResult
+    internal sealed class ListenerAsyncResult : IAsyncResult
     {
         private ManualResetEvent? _handle;
         private bool _synch;
         private bool _completed;
-        private AsyncCallback? _cb;
-        private object? _state;
+        private readonly AsyncCallback? _cb;
+        private readonly object? _state;
         private Exception? _exception;
         private HttpListenerContext? _context;
-        private object _locker = new object();
+        private readonly object _locker = new object();
         private ListenerAsyncResult? _forward;
         internal readonly HttpListener _parent;
         internal bool _endCalled;
@@ -67,20 +68,19 @@ namespace System.Net
             }
             _exception = exc;
             if (_inGet && (exc is ObjectDisposedException))
-                _exception = new HttpListenerException((int)HttpStatusCode.InternalServerError, SR.net_listener_close);
+                _exception = new HttpListenerException((int)SocketError.OperationAborted, SR.net_listener_close);
             lock (_locker)
             {
                 _completed = true;
-                if (_handle != null)
-                    _handle.Set();
+                _handle?.Set();
 
                 if (_cb != null)
                     ThreadPool.UnsafeQueueUserWorkItem(s_invokeCB, this);
             }
         }
 
-        private static WaitCallback s_invokeCB = new WaitCallback(InvokeCallback!);
-        private static void InvokeCallback(object o)
+        private static readonly WaitCallback s_invokeCB = InvokeCallback;
+        private static void InvokeCallback(object? o)
         {
             ListenerAsyncResult ares = (ListenerAsyncResult)o!;
             if (ares._forward != null)
@@ -177,8 +177,7 @@ namespace System.Net
                     _completed = true;
                     _synch = false;
 
-                    if (_handle != null)
-                        _handle.Set();
+                    _handle?.Set();
 
                     if (_cb != null)
                         ThreadPool.UnsafeQueueUserWorkItem(s_invokeCB, this);
@@ -220,8 +219,7 @@ namespace System.Net
 
                 lock (_locker)
                 {
-                    if (_handle == null)
-                        _handle = new ManualResetEvent(_completed);
+                    _handle ??= new ManualResetEvent(_completed);
                 }
 
                 return _handle;

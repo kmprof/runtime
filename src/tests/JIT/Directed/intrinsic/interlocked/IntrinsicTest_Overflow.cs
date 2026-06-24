@@ -7,6 +7,7 @@
 using System;
 using System.Threading;
 using System.Runtime.CompilerServices;
+using Xunit;
 public class IntrinsicTest
 {
     private static int s_counter = 3245;
@@ -23,7 +24,7 @@ public class IntrinsicTest
     private static long s_idjunk = 0;
     [MethodImpl(MethodImplOptions.NoInlining)]
 
-    private IntrinsicTest() { _instanceCounter = 3245; _instanceCounter64 = 3245; _id_instanceCounter = 3245; _id_instanceCounter64 = 3245; }
+    public IntrinsicTest() { _instanceCounter = 3245; _instanceCounter64 = 3245; _id_instanceCounter = 3245; _id_instanceCounter64 = 3245; }
     public int GetValue() { s_temp++; return (int)0x1ceddeed; }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -129,7 +130,8 @@ public class IntrinsicTest
         return fail;
     }
 
-    private static int Main()
+    [Fact]
+    public static int TestEntryPoint()
     {
         if (MainTest())
         {

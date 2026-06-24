@@ -1,12 +1,16 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace Runtime_38920;
+
 using System;
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using Xunit;
 
-class TestStructs
+public class TestStructs
 {
     static int exitStatus = 100;
 
@@ -85,7 +89,8 @@ class TestStructs
         }
     }
 
-    public static int Main()
+    [Fact]
+    public static int TestEntryPoint()
     {
         int b = 1;
         int c = 2;

@@ -1,12 +1,12 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using System.Diagnostics;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
-
-using Internal.Runtime.CompilerServices;
 
 namespace System
 {
@@ -15,7 +15,7 @@ namespace System
     /// </summary>
     public static class BitConverter
     {
-        // This field indicates the "endianess" of the architecture.
+        // This field indicates the "endianness" of the architecture.
         // The value is set to true if the architecture is
         // little endian; false if it is big endian.
 #if BIGENDIAN
@@ -31,12 +31,7 @@ namespace System
         /// </summary>
         /// <param name="value">A Boolean value.</param>
         /// <returns>A byte array with length 1.</returns>
-        public static byte[] GetBytes(bool value)
-        {
-            byte[] r = new byte[1];
-            r[0] = (value ? (byte)1 : (byte)0);
-            return r;
-        }
+        public static byte[] GetBytes(bool value) => [(value ? (byte)1 : (byte)0)];
 
         /// <summary>
         /// Converts a Boolean into a span of bytes.
@@ -61,7 +56,8 @@ namespace System
         public static byte[] GetBytes(char value)
         {
             byte[] bytes = new byte[sizeof(char)];
-            Unsafe.As<byte, char>(ref bytes[0]) = value;
+            bool success = TryWriteBytes(bytes, value);
+            Debug.Assert(success);
             return bytes;
         }
 
@@ -88,7 +84,8 @@ namespace System
         public static byte[] GetBytes(short value)
         {
             byte[] bytes = new byte[sizeof(short)];
-            Unsafe.As<byte, short>(ref bytes[0]) = value;
+            bool success = TryWriteBytes(bytes, value);
+            Debug.Assert(success);
             return bytes;
         }
 
@@ -115,7 +112,8 @@ namespace System
         public static byte[] GetBytes(int value)
         {
             byte[] bytes = new byte[sizeof(int)];
-            Unsafe.As<byte, int>(ref bytes[0]) = value;
+            bool success = TryWriteBytes(bytes, value);
+            Debug.Assert(success);
             return bytes;
         }
 
@@ -142,7 +140,8 @@ namespace System
         public static byte[] GetBytes(long value)
         {
             byte[] bytes = new byte[sizeof(long)];
-            Unsafe.As<byte, long>(ref bytes[0]) = value;
+            bool success = TryWriteBytes(bytes, value);
+            Debug.Assert(success);
             return bytes;
         }
 
@@ -162,6 +161,34 @@ namespace System
         }
 
         /// <summary>
+        /// Returns the specified 128-bit signed integer value as an array of bytes.
+        /// </summary>
+        /// <param name="value">The number to convert.</param>
+        /// <returns>An array of bytes with length 16.</returns>
+        public static byte[] GetBytes(Int128 value)
+        {
+            byte[] bytes = new byte[Int128.Size];
+            bool success = TryWriteBytes(bytes, value);
+            Debug.Assert(success);
+            return bytes;
+        }
+
+        /// <summary>
+        /// Converts a 128-bit signed integer into a span of bytes.
+        /// </summary>
+        /// <param name="destination">When this method returns, the bytes representing the converted 128-bit signed integer.</param>
+        /// <param name="value">The 128-bit signed integer to convert.</param>
+        /// <returns><see langword="true"/> if the conversion was successful; <see langword="false"/> otherwise.</returns>
+        public static bool TryWriteBytes(Span<byte> destination, Int128 value)
+        {
+            if (destination.Length < Int128.Size)
+                return false;
+
+            Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(destination), value);
+            return true;
+        }
+
+        /// <summary>
         /// Returns the specified 16-bit unsigned integer value as an array of bytes.
         /// </summary>
         /// <param name="value">The number to convert.</param>
@@ -170,7 +197,8 @@ namespace System
         public static byte[] GetBytes(ushort value)
         {
             byte[] bytes = new byte[sizeof(ushort)];
-            Unsafe.As<byte, ushort>(ref bytes[0]) = value;
+            bool success = TryWriteBytes(bytes, value);
+            Debug.Assert(success);
             return bytes;
         }
 
@@ -199,7 +227,8 @@ namespace System
         public static byte[] GetBytes(uint value)
         {
             byte[] bytes = new byte[sizeof(uint)];
-            Unsafe.As<byte, uint>(ref bytes[0]) = value;
+            bool success = TryWriteBytes(bytes, value);
+            Debug.Assert(success);
             return bytes;
         }
 
@@ -220,7 +249,7 @@ namespace System
         }
 
         /// <summary>
-        /// Returns the specified 64-bit signed integer value as an array of bytes.
+        /// Returns the specified 64-bit unsigned integer value as an array of bytes.
         /// </summary>
         /// <param name="value">The number to convert.</param>
         /// <returns>An array of bytes with length 8.</returns>
@@ -228,7 +257,8 @@ namespace System
         public static byte[] GetBytes(ulong value)
         {
             byte[] bytes = new byte[sizeof(ulong)];
-            Unsafe.As<byte, ulong>(ref bytes[0]) = value;
+            bool success = TryWriteBytes(bytes, value);
+            Debug.Assert(success);
             return bytes;
         }
 
@@ -249,6 +279,64 @@ namespace System
         }
 
         /// <summary>
+        /// Returns the specified 128-bit unsigned integer value as an array of bytes.
+        /// </summary>
+        /// <param name="value">The number to convert.</param>
+        /// <returns>An array of bytes with length 16.</returns>
+        [CLSCompliant(false)]
+        public static byte[] GetBytes(UInt128 value)
+        {
+            byte[] bytes = new byte[UInt128.Size];
+            bool success = TryWriteBytes(bytes, value);
+            Debug.Assert(success);
+            return bytes;
+        }
+
+        /// <summary>
+        /// Converts a 128-bit unsigned integer into a span of bytes.
+        /// </summary>
+        /// <param name="destination">When this method returns, the bytes representing the converted 128-bit unsigned integer.</param>
+        /// <param name="value">The 128-bit unsigned integer to convert.</param>
+        /// <returns><see langword="true"/> if the conversion was successful; <see langword="false"/> otherwise.</returns>
+        [CLSCompliant(false)]
+        public static bool TryWriteBytes(Span<byte> destination, UInt128 value)
+        {
+            if (destination.Length < UInt128.Size)
+                return false;
+
+            Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(destination), value);
+            return true;
+        }
+
+        /// <summary>
+        /// Returns the specified <see cref="BFloat16"/> value as an array of bytes.
+        /// </summary>
+        /// <param name="value">The number to convert.</param>
+        /// <returns>An array of bytes with length 2.</returns>
+        public static unsafe byte[] GetBytes(BFloat16 value)
+        {
+            byte[] bytes = new byte[sizeof(BFloat16)];
+            bool success = TryWriteBytes(bytes, value);
+            Debug.Assert(success);
+            return bytes;
+        }
+
+        /// <summary>
+        /// Converts a <see cref="BFloat16"/> value into a span of bytes.
+        /// </summary>
+        /// <param name="destination">When this method returns, the bytes representing the converted <see cref="BFloat16"/> value.</param>
+        /// <param name="value">The <see cref="BFloat16"/> value to convert.</param>
+        /// <returns><see langword="true"/> if the conversion was successful; <see langword="false"/> otherwise.</returns>
+        public static unsafe bool TryWriteBytes(Span<byte> destination, BFloat16 value)
+        {
+            if (destination.Length < sizeof(BFloat16))
+                return false;
+
+            Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(destination), value);
+            return true;
+        }
+
+        /// <summary>
         /// Returns the specified half-precision floating point value as an array of bytes.
         /// </summary>
         /// <param name="value">The number to convert.</param>
@@ -256,7 +344,8 @@ namespace System
         public static unsafe byte[] GetBytes(Half value)
         {
             byte[] bytes = new byte[sizeof(Half)];
-            Unsafe.As<byte, Half>(ref bytes[0]) = value;
+            bool success = TryWriteBytes(bytes, value);
+            Debug.Assert(success);
             return bytes;
         }
 
@@ -283,7 +372,8 @@ namespace System
         public static byte[] GetBytes(float value)
         {
             byte[] bytes = new byte[sizeof(float)];
-            Unsafe.As<byte, float>(ref bytes[0]) = value;
+            bool success = TryWriteBytes(bytes, value);
+            Debug.Assert(success);
             return bytes;
         }
 
@@ -310,7 +400,8 @@ namespace System
         public static byte[] GetBytes(double value)
         {
             byte[] bytes = new byte[sizeof(double)];
-            Unsafe.As<byte, double>(ref bytes[0]) = value;
+            bool success = TryWriteBytes(bytes, value);
+            Debug.Assert(success);
             return bytes;
         }
 
@@ -368,9 +459,9 @@ namespace System
             if (value == null)
                 ThrowHelper.ThrowArgumentNullException(ExceptionArgument.value);
             if (unchecked((uint)startIndex) >= unchecked((uint)value.Length))
-                ThrowHelper.ThrowArgumentOutOfRangeException(ExceptionArgument.startIndex, ExceptionResource.ArgumentOutOfRange_Index);
+                ThrowHelper.ThrowArgumentOutOfRangeException(ExceptionArgument.startIndex, ExceptionResource.ArgumentOutOfRange_IndexMustBeLess);
             if (startIndex > value.Length - sizeof(short))
-                ThrowHelper.ThrowArgumentException(ExceptionResource.Arg_ArrayPlusOffTooSmall, ExceptionArgument.value);
+                ThrowHelper.ThrowArgumentException(ExceptionResource.Arg_ByteArrayTooSmallForValue, ExceptionArgument.value);
 
             return Unsafe.ReadUnaligned<short>(ref value[startIndex]);
         }
@@ -406,9 +497,9 @@ namespace System
             if (value == null)
                 ThrowHelper.ThrowArgumentNullException(ExceptionArgument.value);
             if (unchecked((uint)startIndex) >= unchecked((uint)value.Length))
-                ThrowHelper.ThrowArgumentOutOfRangeException(ExceptionArgument.startIndex, ExceptionResource.ArgumentOutOfRange_Index);
+                ThrowHelper.ThrowArgumentOutOfRangeException(ExceptionArgument.startIndex, ExceptionResource.ArgumentOutOfRange_IndexMustBeLess);
             if (startIndex > value.Length - sizeof(int))
-                ThrowHelper.ThrowArgumentException(ExceptionResource.Arg_ArrayPlusOffTooSmall, ExceptionArgument.value);
+                ThrowHelper.ThrowArgumentException(ExceptionResource.Arg_ByteArrayTooSmallForValue, ExceptionArgument.value);
 
             return Unsafe.ReadUnaligned<int>(ref value[startIndex]);
         }
@@ -444,9 +535,9 @@ namespace System
             if (value == null)
                 ThrowHelper.ThrowArgumentNullException(ExceptionArgument.value);
             if (unchecked((uint)startIndex) >= unchecked((uint)value.Length))
-                ThrowHelper.ThrowArgumentOutOfRangeException(ExceptionArgument.startIndex, ExceptionResource.ArgumentOutOfRange_Index);
+                ThrowHelper.ThrowArgumentOutOfRangeException(ExceptionArgument.startIndex, ExceptionResource.ArgumentOutOfRange_IndexMustBeLess);
             if (startIndex > value.Length - sizeof(long))
-                ThrowHelper.ThrowArgumentException(ExceptionResource.Arg_ArrayPlusOffTooSmall, ExceptionArgument.value);
+                ThrowHelper.ThrowArgumentException(ExceptionResource.Arg_ByteArrayTooSmallForValue, ExceptionArgument.value);
 
             return Unsafe.ReadUnaligned<long>(ref value[startIndex]);
         }
@@ -463,6 +554,44 @@ namespace System
             if (value.Length < sizeof(long))
                 ThrowHelper.ThrowArgumentOutOfRangeException(ExceptionArgument.value);
             return Unsafe.ReadUnaligned<long>(ref MemoryMarshal.GetReference(value));
+        }
+
+        /// <summary>
+        /// Returns a 128-bit signed integer converted from sixteen bytes at a specified position in a byte array.
+        /// </summary>
+        /// <param name="value">An array of bytes.</param>
+        /// <param name="startIndex">The starting position within <paramref name="value"/>.</param>
+        /// <returns>A 128-bit signed integer formed by sixteen bytes beginning at <paramref name="startIndex"/>.</returns>
+        /// <exception cref="ArgumentException">
+        /// <paramref name="startIndex"/> is greater than or equal to the length of <paramref name="value"/> minus 15,
+        /// and is less than or equal to the length of <paramref name="value"/> minus 1.
+        /// </exception>
+        /// <exception cref="ArgumentNullException"><paramref name="value"/> is null.</exception>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="startIndex"/> is less than zero or greater than the length of <paramref name="value"/> minus 1.</exception>
+        public static Int128 ToInt128(byte[] value, int startIndex)
+        {
+            if (value == null)
+                ThrowHelper.ThrowArgumentNullException(ExceptionArgument.value);
+            if (unchecked((uint)startIndex) >= unchecked((uint)value.Length))
+                ThrowHelper.ThrowArgumentOutOfRangeException(ExceptionArgument.startIndex, ExceptionResource.ArgumentOutOfRange_IndexMustBeLess);
+            if (startIndex > value.Length - Int128.Size)
+                ThrowHelper.ThrowArgumentException(ExceptionResource.Arg_ByteArrayTooSmallForValue, ExceptionArgument.value);
+
+            return Unsafe.ReadUnaligned<Int128>(ref value[startIndex]);
+        }
+
+        /// <summary>
+        /// Converts a read-only byte span into a 128-bit signed integer.
+        /// </summary>
+        /// <param name="value">A read-only span containing the bytes to convert.</param>
+        /// <returns>A 128-bit signed integer representing the converted bytes.</returns>
+        /// <exception cref="ArgumentOutOfRangeException">The length of <paramref name="value"/> is less than 16.</exception>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Int128 ToInt128(ReadOnlySpan<byte> value)
+        {
+            if (value.Length < Int128.Size)
+                ThrowHelper.ThrowArgumentOutOfRangeException(ExceptionArgument.value);
+            return Unsafe.ReadUnaligned<Int128>(ref MemoryMarshal.GetReference(value));
         }
 
         /// <summary>
@@ -523,7 +652,7 @@ namespace System
         }
 
         /// <summary>
-        /// Returns a 64-bit unsigned integer converted from four bytes at a specified position in a byte array.
+        /// Returns a 64-bit unsigned integer converted from eight bytes at a specified position in a byte array.
         /// </summary>
         /// <param name="value">An array of bytes.</param>
         /// <param name="startIndex">The starting position within <paramref name="value"/>.</param>
@@ -550,6 +679,71 @@ namespace System
             if (value.Length < sizeof(ulong))
                 ThrowHelper.ThrowArgumentOutOfRangeException(ExceptionArgument.value);
             return Unsafe.ReadUnaligned<ulong>(ref MemoryMarshal.GetReference(value));
+        }
+
+        /// <summary>
+        /// Returns a 128-bit unsigned integer converted from sixteen bytes at a specified position in a byte array.
+        /// </summary>
+        /// <param name="value">An array of bytes.</param>
+        /// <param name="startIndex">The starting position within <paramref name="value"/>.</param>
+        /// <returns>A 128-bit unsigned integer formed by sixteen bytes beginning at <paramref name="startIndex"/>.</returns>
+        /// <exception cref="ArgumentException">
+        /// <paramref name="startIndex"/> is greater than or equal to the length of <paramref name="value"/> minus 15,
+        /// and is less than or equal to the length of <paramref name="value"/> minus 1.
+        /// </exception>
+        /// <exception cref="ArgumentNullException"><paramref name="value"/> is null.</exception>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="startIndex"/> is less than zero or greater than the length of <paramref name="value"/> minus 1.</exception>
+        [CLSCompliant(false)]
+        public static UInt128 ToUInt128(byte[] value, int startIndex)
+        {
+            if (value == null)
+                ThrowHelper.ThrowArgumentNullException(ExceptionArgument.value);
+            if (unchecked((uint)startIndex) >= unchecked((uint)value.Length))
+                ThrowHelper.ThrowArgumentOutOfRangeException(ExceptionArgument.startIndex, ExceptionResource.ArgumentOutOfRange_IndexMustBeLess);
+            if (startIndex > value.Length - UInt128.Size)
+                ThrowHelper.ThrowArgumentException(ExceptionResource.Arg_ByteArrayTooSmallForValue, ExceptionArgument.value);
+
+            return Unsafe.ReadUnaligned<UInt128>(ref value[startIndex]);
+        }
+
+        /// <summary>
+        /// Converts a read-only byte span into a 128-bit unsigned integer.
+        /// </summary>
+        /// <param name="value">A read-only span containing the bytes to convert.</param>
+        /// <returns>A 128-bit unsigned integer representing the converted bytes.</returns>
+        /// <exception cref="ArgumentOutOfRangeException">The length of <paramref name="value"/> is less than 16.</exception>
+        [CLSCompliant(false)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static UInt128 ToUInt128(ReadOnlySpan<byte> value)
+        {
+            if (value.Length < UInt128.Size)
+                ThrowHelper.ThrowArgumentOutOfRangeException(ExceptionArgument.value);
+            return Unsafe.ReadUnaligned<UInt128>(ref MemoryMarshal.GetReference(value));
+        }
+
+        /// <summary>
+        /// Returns a <see cref="BFloat16"/> number converted from two bytes at a specified position in a byte array.
+        /// </summary>
+        /// <param name="value">An array of bytes.</param>
+        /// <param name="startIndex">The starting position within <paramref name="value"/>.</param>
+        /// <returns>A <see cref="BFloat16"/> number signed integer formed by two bytes beginning at <paramref name="startIndex"/>.</returns>
+        /// <exception cref="ArgumentException"><paramref name="startIndex"/> equals the length of <paramref name="value"/> minus 1.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="value"/> is null.</exception>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="startIndex"/> is less than zero or greater than the length of <paramref name="value"/> minus 1.</exception>
+        public static BFloat16 ToBFloat16(byte[] value, int startIndex) => Int16BitsToBFloat16(ToInt16(value, startIndex));
+
+        /// <summary>
+        /// Converts a read-only byte span into a <see cref="BFloat16"/> value.
+        /// </summary>
+        /// <param name="value">A read-only span containing the bytes to convert.</param>
+        /// <returns>A <see cref="BFloat16"/> value representing the converted bytes.</returns>
+        /// <exception cref="ArgumentOutOfRangeException">The length of <paramref name="value"/> is less than 2.</exception>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static unsafe BFloat16 ToBFloat16(ReadOnlySpan<byte> value)
+        {
+            if (value.Length < sizeof(BFloat16))
+                ThrowHelper.ThrowArgumentOutOfRangeException(ExceptionArgument.value);
+            return Unsafe.ReadUnaligned<BFloat16>(ref MemoryMarshal.GetReference(value));
         }
 
         /// <summary>
@@ -606,7 +800,7 @@ namespace System
         }
 
         /// <summary>
-        /// Returns a double-precision floating point number converted from four bytes at a specified position in a byte array.
+        /// Returns a double-precision floating point number converted from eight bytes at a specified position in a byte array.
         /// </summary>
         /// <param name="value">An array of bytes.</param>
         /// <param name="startIndex">The starting position within <paramref name="value"/>.</param>
@@ -658,42 +852,37 @@ namespace System
             if (value == null)
                 ThrowHelper.ThrowArgumentNullException(ExceptionArgument.value);
             if (startIndex < 0 || startIndex >= value.Length && startIndex > 0)
-                ThrowHelper.ThrowArgumentOutOfRangeException(ExceptionArgument.startIndex, ExceptionResource.ArgumentOutOfRange_Index);
-            if (length < 0)
-                throw new ArgumentOutOfRangeException(nameof(length), SR.ArgumentOutOfRange_GenericPositive);
+                ThrowHelper.ThrowArgumentOutOfRangeException(ExceptionArgument.startIndex, ExceptionResource.ArgumentOutOfRange_IndexMustBeLess);
+            ArgumentOutOfRangeException.ThrowIfNegative(length);
             if (startIndex > value.Length - length)
-                ThrowHelper.ThrowArgumentException(ExceptionResource.Arg_ArrayPlusOffTooSmall, ExceptionArgument.value);
+                ThrowHelper.ThrowArgumentException(ExceptionResource.Arg_ByteArrayTooSmallForValue, ExceptionArgument.value);
 
             if (length == 0)
             {
                 return string.Empty;
             }
 
-            if (length > (int.MaxValue / 3))
+            // (int.MaxValue / 3) == 715,827,882 Bytes == 699 MB
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(length, int.MaxValue / 3);
+
+            string result = string.FastAllocateString(length * 3 - 1);
+
+            var dst = new Span<char>(ref result.GetRawStringData(), result.Length);
+            var src = new ReadOnlySpan<byte>(value, startIndex, length);
+            int i = 0;
+            int j = 0;
+            byte b = src[i++];
+            dst[j++] = HexConverter.ToCharUpper(b >> 4);
+            dst[j++] = HexConverter.ToCharUpper(b);
+            while (i < src.Length)
             {
-                // (int.MaxValue / 3) == 715,827,882 Bytes == 699 MB
-                throw new ArgumentOutOfRangeException(nameof(length), SR.Format(SR.ArgumentOutOfRange_LengthTooLarge, int.MaxValue / 3));
-            }
-
-            return string.Create(length * 3 - 1, (value, startIndex, length), static (dst, state) =>
-            {
-                var src = new ReadOnlySpan<byte>(state.value, state.startIndex, state.length);
-
-                int i = 0;
-                int j = 0;
-
-                byte b = src[i++];
+                b = src[i++];
+                dst[j++] = '-';
                 dst[j++] = HexConverter.ToCharUpper(b >> 4);
                 dst[j++] = HexConverter.ToCharUpper(b);
+            }
 
-                while (i < src.Length)
-                {
-                    b = src[i++];
-                    dst[j++] = '-';
-                    dst[j++] = HexConverter.ToCharUpper(b >> 4);
-                    dst[j++] = HexConverter.ToCharUpper(b);
-                }
-            });
+            return result;
         }
 
         /// <summary>
@@ -743,9 +932,9 @@ namespace System
             if (value == null)
                 ThrowHelper.ThrowArgumentNullException(ExceptionArgument.value);
             if (startIndex < 0)
-                ThrowHelper.ThrowArgumentOutOfRangeException(ExceptionArgument.startIndex, ExceptionResource.ArgumentOutOfRange_Index);
-            if (startIndex > value.Length - 1)
-                ThrowHelper.ThrowArgumentOutOfRangeException(ExceptionArgument.startIndex, ExceptionResource.ArgumentOutOfRange_Index); // differs from other overloads, which throw base ArgumentException
+                ThrowHelper.ThrowArgumentOutOfRangeException(ExceptionArgument.startIndex, ExceptionResource.ArgumentOutOfRange_IndexMustBeLess);
+            if (startIndex >= value.Length)
+                ThrowHelper.ThrowArgumentOutOfRangeException(ExceptionArgument.startIndex, ExceptionResource.ArgumentOutOfRange_IndexMustBeLess); // differs from other overloads, which throw base ArgumentException
 
             return value[startIndex] != 0;
         }
@@ -769,72 +958,32 @@ namespace System
         /// </summary>
         /// <param name="value">The number to convert.</param>
         /// <returns>A 64-bit signed integer whose bits are identical to <paramref name="value"/>.</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe long DoubleToInt64Bits(double value)
-        {
-            // Workaround for https://github.com/dotnet/runtime/issues/11413
-            if (Sse2.X64.IsSupported)
-            {
-                Vector128<long> vec = Vector128.CreateScalarUnsafe(value).AsInt64();
-                return Sse2.X64.ConvertToInt64(vec);
-            }
-
-            return *((long*)&value);
-        }
+        [Intrinsic]
+        public static long DoubleToInt64Bits(double value) => Unsafe.BitCast<double, long>(value);
 
         /// <summary>
         /// Converts the specified 64-bit signed integer to a double-precision floating point number.
         /// </summary>
         /// <param name="value">The number to convert.</param>
         /// <returns>A double-precision floating point number whose bits are identical to <paramref name="value"/>.</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe double Int64BitsToDouble(long value)
-        {
-            // Workaround for https://github.com/dotnet/runtime/issues/11413
-            if (Sse2.X64.IsSupported)
-            {
-                Vector128<double> vec = Vector128.CreateScalarUnsafe(value).AsDouble();
-                return vec.ToScalar();
-            }
-
-            return *((double*)&value);
-        }
+        [Intrinsic]
+        public static double Int64BitsToDouble(long value) => Unsafe.BitCast<long, double>(value);
 
         /// <summary>
         /// Converts the specified single-precision floating point number to a 32-bit signed integer.
         /// </summary>
         /// <param name="value">The number to convert.</param>
         /// <returns>A 32-bit signed integer whose bits are identical to <paramref name="value"/>.</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe int SingleToInt32Bits(float value)
-        {
-            // Workaround for https://github.com/dotnet/runtime/issues/11413
-            if (Sse2.IsSupported)
-            {
-                Vector128<int> vec = Vector128.CreateScalarUnsafe(value).AsInt32();
-                return Sse2.ConvertToInt32(vec);
-            }
-
-            return *((int*)&value);
-        }
+        [Intrinsic]
+        public static int SingleToInt32Bits(float value) => Unsafe.BitCast<float, int>(value);
 
         /// <summary>
         /// Converts the specified 32-bit signed integer to a single-precision floating point number.
         /// </summary>
         /// <param name="value">The number to convert.</param>
         /// <returns>A single-precision floating point number whose bits are identical to <paramref name="value"/>.</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe float Int32BitsToSingle(int value)
-        {
-            // Workaround for https://github.com/dotnet/runtime/issues/11413
-            if (Sse2.IsSupported)
-            {
-                Vector128<float> vec = Vector128.CreateScalarUnsafe(value).AsSingle();
-                return vec.ToScalar();
-            }
-
-            return *((float*)&value);
-        }
+        [Intrinsic]
+        public static float Int32BitsToSingle(int value) => Unsafe.BitCast<int, float>(value);
 
         /// <summary>
         /// Converts the specified half-precision floating point number to a 16-bit signed integer.
@@ -842,10 +991,7 @@ namespace System
         /// <param name="value">The number to convert.</param>
         /// <returns>A 16-bit signed integer whose bits are identical to <paramref name="value"/>.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe short HalfToInt16Bits(Half value)
-        {
-            return *((short*)&value);
-        }
+        public static short HalfToInt16Bits(Half value) => (short)value._value;
 
         /// <summary>
         /// Converts the specified 16-bit signed integer to a half-precision floating point number.
@@ -853,9 +999,94 @@ namespace System
         /// <param name="value">The number to convert.</param>
         /// <returns>A half-precision floating point number whose bits are identical to <paramref name="value"/>.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe Half Int16BitsToHalf(short value)
-        {
-            return *(Half*)&value;
-        }
+        public static Half Int16BitsToHalf(short value) => new Half((ushort)(value));
+
+        /// <summary>
+        /// Converts the specified <see cref="BFloat16"/> number to a 16-bit signed integer.
+        /// </summary>
+        /// <param name="value">The number to convert.</param>
+        /// <returns>A 16-bit signed integer whose bits are identical to <paramref name="value"/>.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static short BFloat16ToInt16Bits(BFloat16 value) => (short)value._value;
+
+        /// <summary>
+        /// Converts the specified 16-bit signed integer to a <see cref="BFloat16"/> number.
+        /// </summary>
+        /// <param name="value">The number to convert.</param>
+        /// <returns>A <see cref="BFloat16"/> number whose bits are identical to <paramref name="value"/>.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static BFloat16 Int16BitsToBFloat16(short value) => new BFloat16((ushort)(value));
+
+        /// <summary>
+        /// Converts the specified double-precision floating point number to a 64-bit unsigned integer.
+        /// </summary>
+        /// <param name="value">The number to convert.</param>
+        /// <returns>A 64-bit unsigned integer whose bits are identical to <paramref name="value"/>.</returns>
+        [CLSCompliant(false)]
+        [Intrinsic]
+        public static ulong DoubleToUInt64Bits(double value) => Unsafe.BitCast<double, ulong>(value);
+
+        /// <summary>
+        /// Converts the specified 64-bit unsigned integer to a double-precision floating point number.
+        /// </summary>
+        /// <param name="value">The number to convert.</param>
+        /// <returns>A double-precision floating point number whose bits are identical to <paramref name="value"/>.</returns>
+        [CLSCompliant(false)]
+        [Intrinsic]
+        public static double UInt64BitsToDouble(ulong value) => Unsafe.BitCast<ulong, double>(value);
+
+        /// <summary>
+        /// Converts the specified single-precision floating point number to a 32-bit unsigned integer.
+        /// </summary>
+        /// <param name="value">The number to convert.</param>
+        /// <returns>A 32-bit unsigned integer whose bits are identical to <paramref name="value"/>.</returns>
+        [CLSCompliant(false)]
+        [Intrinsic]
+        public static uint SingleToUInt32Bits(float value) => Unsafe.BitCast<float, uint>(value);
+
+        /// <summary>
+        /// Converts the specified 32-bit unsigned integer to a single-precision floating point number.
+        /// </summary>
+        /// <param name="value">The number to convert.</param>
+        /// <returns>A single-precision floating point number whose bits are identical to <paramref name="value"/>.</returns>
+        [CLSCompliant(false)]
+        [Intrinsic]
+        public static float UInt32BitsToSingle(uint value) => Unsafe.BitCast<uint, float>(value);
+
+        /// <summary>
+        /// Converts the specified half-precision floating point number to a 16-bit unsigned integer.
+        /// </summary>
+        /// <param name="value">The number to convert.</param>
+        /// <returns>A 16-bit unsigned integer whose bits are identical to <paramref name="value"/>.</returns>
+        [CLSCompliant(false)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ushort HalfToUInt16Bits(Half value) => value._value;
+
+        /// <summary>
+        /// Converts the specified 16-bit unsigned integer to a half-precision floating point number.
+        /// </summary>
+        /// <param name="value">The number to convert.</param>
+        /// <returns>A half-precision floating point number whose bits are identical to <paramref name="value"/>.</returns>
+        [CLSCompliant(false)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Half UInt16BitsToHalf(ushort value) => new Half(value);
+
+        /// <summary>
+        /// Converts the specified <see cref="BFloat16"/> number to a 16-bit unsigned integer.
+        /// </summary>
+        /// <param name="value">The number to convert.</param>
+        /// <returns>A 16-bit unsigned integer whose bits are identical to <paramref name="value"/>.</returns>
+        [CLSCompliant(false)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ushort BFloat16ToUInt16Bits(BFloat16 value) => value._value;
+
+        /// <summary>
+        /// Converts the specified 16-bit unsigned integer to a <see cref="BFloat16"/> number.
+        /// </summary>
+        /// <param name="value">The number to convert.</param>
+        /// <returns>A <see cref="BFloat16"/> number whose bits are identical to <paramref name="value"/>.</returns>
+        [CLSCompliant(false)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static BFloat16 UInt16BitsToBFloat16(ushort value) => new BFloat16(value);
     }
 }

@@ -7,8 +7,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Sources;
 
-using Internal.Runtime.CompilerServices;
-
 namespace System.Runtime.CompilerServices
 {
     /// <summary>Provides an awaitable type that enables configured awaits on a <see cref="ValueTask"/>.</summary>
@@ -16,7 +14,7 @@ namespace System.Runtime.CompilerServices
     public readonly struct ConfiguredValueTaskAwaitable
     {
         /// <summary>The wrapped <see cref="Task"/>.</summary>
-        private readonly ValueTask _value;
+        internal readonly ValueTask _value;
 
         /// <summary>Initializes the awaitable.</summary>
         /// <param name="value">The wrapped <see cref="ValueTask"/>.</param>
@@ -121,7 +119,7 @@ namespace System.Runtime.CompilerServices
     public readonly struct ConfiguredValueTaskAwaitable<TResult>
     {
         /// <summary>The wrapped <see cref="ValueTask{TResult}"/>.</summary>
-        private readonly ValueTask<TResult> _value;
+        internal readonly ValueTask<TResult> _value;
 
         /// <summary>Initializes the awaitable.</summary>
         /// <param name="value">The wrapped <see cref="ValueTask{TResult}"/>.</param>

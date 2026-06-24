@@ -1,8 +1,12 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace Runtime_764;
+
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 
 // Regression test case for importer bug.
 // If Release is inlined into Main, the importer may unsafely re-order trees.
@@ -24,9 +28,10 @@ public struct Ptr<T> where T: class
     }
 }
 
-class Runtime_764
+public class Runtime_764
 {
-    private static int Main(string[] args)
+    [Fact]
+    public static int TestEntryPoint()
     {
         Ptr<string> ptr = new Ptr<string>("Hello, world");
         

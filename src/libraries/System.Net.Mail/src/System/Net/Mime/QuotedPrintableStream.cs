@@ -1,9 +1,10 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-using System.Diagnostics;
 using System.IO;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace System.Net.Mime
 {
@@ -16,7 +17,7 @@ namespace System.Net.Mime
     /// This stream should only be used for the e-mail content.
     /// Use QEncodedStream for encoding headers.
     /// </summary>
-    internal class QuotedPrintableStream : DelegatedStream, IEncodableStream
+    internal sealed class QuotedPrintableStream : DelegatedStream, IEncodableStream
     {
         //should we encode CRLF or not?
         private readonly bool _encodeCRLF;
@@ -33,8 +34,8 @@ namespace System.Net.Mime
         //if we aren't encoding CRLF then it occupies two chars
         private const int SizeOfNonEncodedCRLF = 2;
 
-        private static ReadOnlySpan<byte> HexDecodeMap => new byte[] // rely on C# compiler optimization to eliminate allocation
-        {
+        private static ReadOnlySpan<byte> HexDecodeMap =>
+        [
             // 0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
              255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, // 0
              255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, // 1
@@ -52,12 +53,11 @@ namespace System.Net.Mime
              255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, // D
              255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, // E
              255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, // F
-        };
+        ];
 
-        private static ReadOnlySpan<byte> HexEncodeMap => new byte[] { 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 65, 66, 67, 68, 69, 70 };
+        private static ReadOnlySpan<byte> HexEncodeMap => "0123456789ABCDEF"u8;
 
         private readonly int _lineLength;
-        private ReadStateInfo? _readState;
         private WriteStateInfoBase? _writeState;
 
         /// <summary>
@@ -67,10 +67,7 @@ namespace System.Net.Mime
         /// <param name="lineLength">Preferred maximum line-length for writes</param>
         internal QuotedPrintableStream(Stream stream, int lineLength) : base(stream)
         {
-            if (lineLength < 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(lineLength));
-            }
+            ArgumentOutOfRangeException.ThrowIfNegative(lineLength);
 
             _lineLength = lineLength;
         }
@@ -80,18 +77,12 @@ namespace System.Net.Mime
             _encodeCRLF = encodeCRLF;
         }
 
-        private ReadStateInfo ReadState => _readState ?? (_readState = new ReadStateInfo());
+        public override bool CanRead => false;
+        public override bool CanWrite => BaseStream.CanWrite;
+
+        private ReadStateInfo ReadState => field ??= new ReadStateInfo();
 
         internal WriteStateInfoBase WriteState => _writeState ??= new WriteStateInfoBase(1024, null, null, _lineLength);
-
-        public override IAsyncResult BeginWrite(byte[] buffer, int offset, int count, AsyncCallback? callback, object? state)
-        {
-            ValidateBufferArguments(buffer, offset, count);
-
-            WriteAsyncResult result = new WriteAsyncResult(this, buffer, offset, count, callback, state);
-            result.Write();
-            return result;
-        }
 
         public override void Close()
         {
@@ -99,14 +90,14 @@ namespace System.Net.Mime
             base.Close();
         }
 
-        public unsafe int DecodeBytes(byte[] buffer, int offset, int count)
+        public unsafe int DecodeBytes(Span<byte> buffer)
         {
             fixed (byte* pBuffer = buffer)
             {
-                byte* start = pBuffer + offset;
+                byte* start = pBuffer;
                 byte* source = start;
                 byte* dest = start;
-                byte* end = start + count;
+                byte* end = start + buffer.Length;
 
                 // if the last read ended in a partially decoded
                 // sequence, pick up where we left off.
@@ -119,7 +110,7 @@ namespace System.Net.Mime
                         // if we only read one byte from the underlying
                         // stream, we'll need to save the byte and
                         // ask for more.
-                        if (count == 1)
+                        if (buffer.Length == 1)
                         {
                             ReadState.Byte = *source;
                             return 0;
@@ -209,20 +200,20 @@ namespace System.Net.Mime
             }
         }
 
-        public int EncodeBytes(byte[] buffer, int offset, int count)
+        public int EncodeBytes(ReadOnlySpan<byte> buffer)
         {
-            int cur = offset;
-            for (; cur < count + offset; cur++)
+            int processed = 0;
+            for (; processed < buffer.Length; processed++)
             {
                 //only fold if we're before a whitespace or if we're at the line limit
                 //add two to the encoded Byte Length to be conservative so that we guarantee that the line length is acceptable
-                if ((_lineLength != -1 && WriteState.CurrentLineLength + SizeOfEncodedChar + 2 >= _lineLength && (buffer[cur] == ' ' ||
-                    buffer[cur] == '\t' || buffer[cur] == '\r' || buffer[cur] == '\n')) ||
+                if ((_lineLength != -1 && WriteState.CurrentLineLength + SizeOfEncodedChar + 2 >= _lineLength && (buffer[processed] == ' ' ||
+                    buffer[processed] == '\t' || buffer[processed] == '\r' || buffer[processed] == '\n')) ||
                     _writeState!.CurrentLineLength + SizeOfEncodedChar + 2 >= EncodedStreamFactory.DefaultMaxLineLength)
                 {
                     if (WriteState.Buffer.Length - WriteState.Length < SizeOfSoftCRLF)
                     {
-                        return cur - offset;  //ok because folding happens externally
+                        return processed;  //ok because folding happens externally
                     }
 
                     WriteState.Append((byte)'=');
@@ -233,18 +224,18 @@ namespace System.Net.Mime
                 // it is done by the underlying 7BitStream
 
                 //detect a CRLF in the input and encode it.
-                if (buffer[cur] == '\r' && cur + 1 < count + offset && buffer[cur + 1] == '\n')
+                if (buffer[processed] == '\r' && processed + 1 < buffer.Length && buffer[processed + 1] == '\n')
                 {
                     if (WriteState.Buffer.Length - WriteState.Length < (_encodeCRLF ? SizeOfEncodedCRLF : SizeOfNonEncodedCRLF))
                     {
-                        return cur - offset;
+                        return processed;
                     }
-                    cur++;
+                    processed++;
 
                     if (_encodeCRLF)
                     {
                         // The encoding for CRLF is =0D=0A
-                        WriteState.Append((byte)'=', (byte)'0', (byte)'D', (byte)'=', (byte)'0', (byte)'A');
+                        WriteState.Append("=0D=0A"u8);
                     }
                     else
                     {
@@ -252,63 +243,61 @@ namespace System.Net.Mime
                     }
                 }
                 //ascii chars less than 32 (control chars) and greater than 126 (non-ascii) are not allowed so we have to encode
-                else if ((buffer[cur] < 32 && buffer[cur] != '\t') ||
-                    buffer[cur] == '=' ||
-                    buffer[cur] > 126)
+                else if ((buffer[processed] < 32 && buffer[processed] != '\t') ||
+                    buffer[processed] == '=' ||
+                    buffer[processed] > 126)
                 {
                     if (WriteState.Buffer.Length - WriteState.Length < SizeOfSoftCRLF)
                     {
-                        return cur - offset;
+                        return processed;
                     }
 
                     //append an = to indicate an encoded character
                     WriteState.Append((byte)'=');
                     //shift 4 to get the first four bytes only and look up the hex digit
-                    WriteState.Append(HexEncodeMap[buffer[cur] >> 4]);
+                    WriteState.Append(HexEncodeMap[buffer[processed] >> 4]);
                     //clear the first four bytes to get the last four and look up the hex digit
-                    WriteState.Append(HexEncodeMap[buffer[cur] & 0xF]);
+                    WriteState.Append(HexEncodeMap[buffer[processed] & 0xF]);
                 }
                 else
                 {
                     if (WriteState.Buffer.Length - WriteState.Length < 1)
                     {
-                        return cur - offset;
+                        return processed;
                     }
 
                     //detect special case:  is whitespace at end of line?  we must encode it if it is
-                    if ((buffer[cur] == (byte)'\t' || buffer[cur] == (byte)' ') &&
-                        (cur + 1 >= count + offset))
+                    if ((buffer[processed] == (byte)'\t' || buffer[processed] == (byte)' ') &&
+                        (processed + 1 >= buffer.Length))
                     {
                         if (WriteState.Buffer.Length - WriteState.Length < SizeOfEncodedChar)
                         {
-                            return cur - offset;
+                            return processed;
                         }
 
                         //append an = to indicate an encoded character
                         WriteState.Append((byte)'=');
                         //shift 4 to get the first four bytes only and look up the hex digit
-                        WriteState.Append(HexEncodeMap[buffer[cur] >> 4]);
+                        WriteState.Append(HexEncodeMap[buffer[processed] >> 4]);
                         //clear the first four bytes to get the last four and look up the hex digit
-                        WriteState.Append(HexEncodeMap[buffer[cur] & 0xF]);
+                        WriteState.Append(HexEncodeMap[buffer[processed] & 0xF]);
                     }
                     else
                     {
-                        WriteState.Append(buffer[cur]);
+                        WriteState.Append(buffer[processed]);
                     }
                 }
             }
-            return cur - offset;
+            return processed;
         }
 
         public int EncodeString(string value, Encoding encoding)
         {
             byte[] buffer = encoding.GetBytes(value);
-            return EncodeBytes(buffer, 0, buffer.Length);
+            return EncodeBytes(buffer);
         }
 
         public string GetEncodedString() => Encoding.ASCII.GetString(WriteState.Buffer, 0, WriteState.Length);
-
-        public override void EndWrite(IAsyncResult asyncResult) => WriteAsyncResult.End(asyncResult);
 
         public override void Flush()
         {
@@ -316,26 +305,66 @@ namespace System.Net.Mime
             base.Flush();
         }
 
-        private void FlushInternal()
+        public override async Task FlushAsync(CancellationToken cancellationToken)
+        {
+            await FlushInternalAsync(cancellationToken).ConfigureAwait(false);
+            await base.FlushAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        private async ValueTask FlushInternalAsync(CancellationToken cancellationToken)
         {
             if (_writeState != null && _writeState.Length > 0)
             {
-                base.Write(WriteState.Buffer, 0, WriteState.Length);
+                await BaseStream.WriteAsync(WriteState.Buffer.AsMemory(0, WriteState.Length), cancellationToken).ConfigureAwait(false);
                 WriteState.BufferFlushed();
             }
         }
 
-        public override void Write(byte[] buffer, int offset, int count)
+        private void FlushInternal()
         {
-            ValidateBufferArguments(buffer, offset, count);
+            if (_writeState != null && _writeState.Length > 0)
+            {
+                BaseStream.Write(WriteState.Buffer, 0, WriteState.Length);
+                WriteState.BufferFlushed();
+            }
+        }
 
+        protected override int ReadInternal(Span<byte> buffer)
+        {
+            throw new NotImplementedException();
+        }
+
+        protected override ValueTask<int> ReadAsyncInternal(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException();
+        }
+
+        protected override void WriteInternal(ReadOnlySpan<byte> buffer)
+        {
             int written = 0;
             while (true)
             {
-                written += EncodeBytes(buffer, offset + written, count - written);
-                if (written < count)
+                written += EncodeBytes(buffer.Slice(written));
+                if (written < buffer.Length)
                 {
                     FlushInternal();
+                }
+                else
+                {
+                    break;
+                }
+            }
+        }
+
+        protected override async ValueTask WriteAsyncInternal(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            int written = 0;
+            while (true)
+            {
+                written += EncodeBytes(buffer.Span.Slice(written));
+                if (written < buffer.Length)
+                {
+                    await FlushInternalAsync(cancellationToken).ConfigureAwait(false);
                 }
                 else
                 {
@@ -348,74 +377,6 @@ namespace System.Net.Mime
         {
             internal bool IsEscaped { get; set; }
             internal short Byte { get; set; } = -1;
-        }
-
-        private sealed class WriteAsyncResult : LazyAsyncResult
-        {
-            private readonly QuotedPrintableStream _parent;
-            private readonly byte[] _buffer;
-            private readonly int _offset;
-            private readonly int _count;
-            private static readonly AsyncCallback s_onWrite = new AsyncCallback(OnWrite);
-            private int _written;
-
-            internal WriteAsyncResult(QuotedPrintableStream parent, byte[] buffer, int offset, int count, AsyncCallback? callback, object? state) : base(null, state, callback)
-            {
-                _parent = parent;
-                _buffer = buffer;
-                _offset = offset;
-                _count = count;
-            }
-
-            private void CompleteWrite(IAsyncResult result)
-            {
-                _parent.BaseStream.EndWrite(result);
-                _parent.WriteState.BufferFlushed();
-            }
-
-            internal static void End(IAsyncResult result)
-            {
-                WriteAsyncResult thisPtr = (WriteAsyncResult)result;
-                thisPtr.InternalWaitForCompletion();
-                Debug.Assert(thisPtr._written == thisPtr._count);
-            }
-
-            private static void OnWrite(IAsyncResult result)
-            {
-                if (!result.CompletedSynchronously)
-                {
-                    WriteAsyncResult thisPtr = (WriteAsyncResult)result.AsyncState!;
-                    try
-                    {
-                        thisPtr.CompleteWrite(result);
-                        thisPtr.Write();
-                    }
-                    catch (Exception e)
-                    {
-                        thisPtr.InvokeCallback(e);
-                    }
-                }
-            }
-
-            internal void Write()
-            {
-                while (true)
-                {
-                    _written += _parent.EncodeBytes(_buffer, _offset + _written, _count - _written);
-                    if (_written < _count)
-                    {
-                        IAsyncResult result = _parent.BaseStream.BeginWrite(_parent.WriteState.Buffer, 0, _parent.WriteState.Length, s_onWrite, this);
-                        if (!result.CompletedSynchronously)
-                            break;
-                        CompleteWrite(result);
-                    }
-                    else
-                    {
-                        InvokeCallback();
-                        break;
-                    }
-                }
-            }
         }
     }
 }

@@ -19,7 +19,10 @@
 // - dmilirud
 
 .assembly extern mscorlib{}
+.assembly extern xunit.core {}
 .assembly self_override5{}
+.assembly extern Microsoft.DotNet.XUnitExtensions { .publickeytoken = (31 BF 38 56 AD 36 4E 35 ) }
+.assembly extern TestLibrary { .ver 0:0:0:0 }
 
 .class public MyBar extends [mscorlib]System.Object
 {
@@ -70,8 +73,13 @@
 .class public beforefieldinit CMain extends [mscorlib]System.Object
 {
 
-  .method public hidebysig static int32  Main(string[] args) cil managed
+  .method public hidebysig static int32  Main() cil managed
   {
+    .custom instance void [xunit.core]Xunit.FactAttribute::.ctor() = (
+        01 00 00 00
+    )
+    .custom instance void [Microsoft.DotNet.XUnitExtensions]Xunit.ActiveIssueAttribute::.ctor(string, class [mscorlib]System.Type, string[]) = {string('Tests that expect TypeLoadException') type([TestLibrary]TestLibrary.Utilities) string[1] ('IsNativeAot') }
+    .custom instance void [Microsoft.DotNet.XUnitExtensions]Xunit.ActiveIssueAttribute::.ctor(string, class [mscorlib]System.Type, string[]) = {string('https://github.com/dotnet/runtime/issues/120708') type([TestLibrary]TestLibrary.PlatformDetection) string[1] ('IsBrowser') }
     .entrypoint
 
     .locals init (bool V_0,

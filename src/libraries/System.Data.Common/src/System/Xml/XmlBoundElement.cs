@@ -3,6 +3,7 @@
 
 using System.Data;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 
 #pragma warning disable 618 // ignore obsolete warning about XmlDataDocument
@@ -19,6 +20,8 @@ namespace System.Xml
         Defoliating,
     }
 
+    [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
+    [RequiresDynamicCode(DataSet.RequiresDynamicCodeMessage)]
     internal sealed class XmlBoundElement : XmlElement
     {
         private DataRow? _row;
@@ -136,7 +139,7 @@ namespace System.Xml
         internal void RemoveAllChildren()
         {
             XmlNode? child = FirstChild;
-            XmlNode? sibling = null;
+            XmlNode? sibling;
 
             while (child != null)
             {
@@ -199,20 +202,14 @@ namespace System.Xml
         internal void Foliate(ElementState newState)
         {
             XmlDataDocument doc = (XmlDataDocument)OwnerDocument;
-            if (doc != null)
-            {
-                doc.Foliate(this, newState);
-            }
+            doc?.Foliate(this, newState);
         }
 
         // Foliate the node as a side effect of user calling functions on this node (like NextSibling) OR as a side effect of DataDocNav using nodes to do editing
         private void AutoFoliate()
         {
             XmlDataDocument doc = (XmlDataDocument)OwnerDocument;
-            if (doc != null)
-            {
-                doc.Foliate(this, doc.AutoFoliationState);
-            }
+            doc?.Foliate(this, doc.AutoFoliationState);
         }
 
         public override XmlNode CloneNode(bool deep)
@@ -381,10 +378,7 @@ namespace System.Xml
 
                 default:
                     Debug.Assert(((IXmlDataVirtualNode)dp).IsOnColumn(null));
-                    if (dp.GetNode() != null)
-                    {
-                        dp.GetNode().WriteTo(w);
-                    }
+                    dp.GetNode()?.WriteTo(w);
                     break;
             }
         }

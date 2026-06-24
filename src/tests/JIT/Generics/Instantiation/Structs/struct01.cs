@@ -3,6 +3,8 @@
 //
 
 using System;
+using Xunit;
+using TestLibrary;
 
 public struct ValX0 { }
 public struct ValY0 { }
@@ -44,7 +46,7 @@ public struct Gen<T>
     }
 }
 
-public class Test
+public class Test_struct01
 {
     public static int counter = 0;
     public static bool result = true;
@@ -59,7 +61,9 @@ public class Test
 
     }
 
-    public static int Main()
+    [ActiveIssue(" needs triage ", typeof(PlatformDetection), nameof(PlatformDetection.IsMonoLLVMAOT))]
+    [Fact]
+    public static int TestEntryPoint()
     {
         Eval((new Gen<int>(new int())).InstVerify(typeof(int)));
         Eval((new Gen<double>(new double())).InstVerify(typeof(double)));

@@ -1,6 +1,7 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using System.Security.Cryptography.Tests;
 using System.Security.Cryptography.Rsa.Tests;
 using Xunit;
 
@@ -305,14 +306,10 @@ namespace System.Security.Cryptography.Csp.Tests
             }
         }
 
-        [Fact]
+        [ConditionalFact(typeof(RSAFactory), nameof(RSAFactory.SupportsSha1Signatures))]
         public static void SignHash_DefaultAlgorithm_Success()
         {
-            byte[] hashVal;
-            using (SHA1 sha1 = SHA1.Create())
-            {
-                hashVal = sha1.ComputeHash(TestData.HelloBytes);
-            }
+            byte[] hashVal = SHA1.HashData(TestData.HelloBytes);
 
             using (var rsa = new RSACryptoServiceProvider())
             {
@@ -321,14 +318,10 @@ namespace System.Security.Cryptography.Csp.Tests
             }
         }
 
-        [Fact]
+        [ConditionalFact(typeof(RSAFactory), nameof(RSAFactory.SupportsSha1Signatures))]
         public static void VerifyHash_DefaultAlgorithm_Success()
         {
-            byte[] hashVal;
-            using (SHA1 sha1 = SHA1.Create())
-            {
-                hashVal = sha1.ComputeHash(TestData.HelloBytes);
-            }
+            byte[] hashVal = SHA1.HashData(TestData.HelloBytes);
 
             using (var rsa = new RSACryptoServiceProvider())
             {
@@ -356,11 +349,24 @@ namespace System.Security.Cryptography.Csp.Tests
         }
 
         [Fact]
+        public static void Decrypt_InvalidDataSize_Throws()
+        {
+            using (var rsa = new RSACryptoServiceProvider())
+            {
+                byte[] data = new byte[rsa.KeySize / 8 - 1];
+                Assert.Throws<CryptographicException>(() => rsa.Decrypt(data, RSAEncryptionPadding.Pkcs1));
+#pragma warning disable SYSLIB0064 // Decrypt with Boolean parameter is obsolete
+                Assert.Throws<CryptographicException>(() => rsa.Decrypt(data, fOAEP: false));
+#pragma warning restore SYSLIB0064
+            }
+        }
+
+        [Fact]
         public static void Sign_InvalidPaddingMode_Throws()
         {
             using (var rsa = new RSACryptoServiceProvider())
             {
-                Assert.Throws<CryptographicException>(() => rsa.SignData(TestData.HelloBytes, HashAlgorithmName.SHA1, RSASignaturePadding.Pss));
+                Assert.Throws<CryptographicException>(() => rsa.SignData(TestData.HelloBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
             }
         }
 
@@ -369,8 +375,8 @@ namespace System.Security.Cryptography.Csp.Tests
         {
             using (var rsa = new RSACryptoServiceProvider())
             {
-                byte[] sig = rsa.SignData(TestData.HelloBytes, "SHA1");
-                Assert.Throws<CryptographicException>(() => rsa.VerifyData(TestData.HelloBytes, sig, HashAlgorithmName.SHA1, RSASignaturePadding.Pss));
+                byte[] sig = rsa.SignData(TestData.HelloBytes, "SHA256");
+                Assert.Throws<CryptographicException>(() => rsa.VerifyData(TestData.HelloBytes, sig, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
             }
         }
 
@@ -386,27 +392,23 @@ namespace System.Security.Cryptography.Csp.Tests
         [Fact]
         public static void SignData_VerifyHash_CaseInsensitive_Success()
         {
-            byte[] hashVal;
-            using (SHA1 sha1 = SHA1.Create())
-            {
-                hashVal = sha1.ComputeHash(TestData.HelloBytes);
-            }
+            byte[] hashVal = SHA256.HashData(TestData.HelloBytes);
 
             using (var rsa = new RSACryptoServiceProvider())
             {
-                byte[] signVal = rsa.SignData(TestData.HelloBytes, "SHA1");
-                Assert.True(rsa.VerifyHash(hashVal, "SHA1", signVal));
+                byte[] signVal = rsa.SignData(TestData.HelloBytes, "SHA256");
+                Assert.True(rsa.VerifyHash(hashVal, "SHA256", signVal));
 
-                signVal = rsa.SignData(TestData.HelloBytes, "sha1");
-                Assert.True(rsa.VerifyHash(hashVal, "sha1", signVal));
+                signVal = rsa.SignData(TestData.HelloBytes, "sha256");
+                Assert.True(rsa.VerifyHash(hashVal, "sha256", signVal));
             }
         }
 
         [Fact]
         [PlatformSpecific(TestPlatforms.AnyUnix)] // Only Unix has _impl shim pattern
-        public static void TestShimOverloads_Unix()
+        public static void TestShimOverrides_Unix()
         {
-            ShimHelpers.VerifyAllBaseMembersOverloaded(typeof(RSACryptoServiceProvider));
+            ShimHelpers.VerifyAllBaseMembersOverridden(typeof(RSACryptoServiceProvider));
         }
 
         private sealed class RsaKeyLifetime : IDisposable

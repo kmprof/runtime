@@ -1,9 +1,13 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_18887;
+
 using System;
 using System.Threading;
 using System.Runtime.CompilerServices;
+using Xunit;
 
 internal class BufferState
 {
@@ -45,12 +49,12 @@ internal class BufferState
     }
 }
 
-class Program
+public class Program
 {
     bool forceUpload;
     BufferState currentState;
 
-    Program()
+    public Program()
     {
         this.forceUpload = false;
         this.currentState = new BufferState();
@@ -61,16 +65,16 @@ class Program
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public void ThrowIfDisposed()
+    internal void ThrowIfDisposed()
     {
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public void QueueCurrentBufferForUploadAndSetNewBuffer()
+    internal void QueueCurrentBufferForUploadAndSetNewBuffer()
     {
     }
 
-    public void Test()
+    internal void Test()
     {
         this.ThrowIfDisposed();
 
@@ -89,7 +93,8 @@ class Program
         }
     }
 
-    public static int Main()
+    [Fact]
+    public static int TestEntryPoint()
     {
         Program p = new Program();
         if (p.currentState.IsIdle)

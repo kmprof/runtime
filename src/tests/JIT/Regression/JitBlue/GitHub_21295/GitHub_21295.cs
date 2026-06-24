@@ -1,8 +1,12 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_21295;
+
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 
 class B
 {
@@ -14,7 +18,7 @@ sealed class D : B
     public override int F() => 44;
 }
 
-class X
+public class X
 {
     volatile static bool p;
 
@@ -27,7 +31,8 @@ class X
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static B G() => p ? GD() : GB();
 
-    public static int Main()
+    [Fact]
+    public static int TestEntryPoint()
     {
         p = false;
         // After inlining G(), the jit must not update

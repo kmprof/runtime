@@ -1,18 +1,10 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-#if ES_BUILD_STANDALONE
-using System;
-using System.Diagnostics;
-#endif
-
-#if ES_BUILD_STANDALONE
-namespace Microsoft.Diagnostics.Tracing
-#else
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.Versioning;
 
 namespace System.Diagnostics.Tracing
-#endif
 {
     /// <summary>
     /// IncrementingEventCounter is a variant of EventCounter for variables that are ever-increasing.
@@ -20,7 +12,7 @@ namespace System.Diagnostics.Tracing
     /// It does not calculate statistics like mean, standard deviation, etc. because it only accumulates
     /// the counter value.
     /// </summary>
-#if NETCOREAPP
+#if !ES_BUILD_STANDALONE
     [UnsupportedOSPlatform("browser")]
 #endif
     public partial class IncrementingEventCounter : DiagnosticCounter
@@ -56,6 +48,9 @@ namespace System.Diagnostics.Tracing
 
         public override string ToString() => $"IncrementingEventCounter '{Name}' Increment {_increment}";
 
+        [UnconditionalSuppressMessage("ReflectionAnalysis", "IL2026:RequiresUnreferencedCode",
+            Justification = "The DynamicDependency will preserve the properties of IncrementingCounterPayload")]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicProperties, typeof(IncrementingCounterPayload))]
         internal override void WritePayload(float intervalSec, int pollingIntervalMillisec)
         {
             lock (this)     // Lock the counter
@@ -90,7 +85,7 @@ namespace System.Diagnostics.Tracing
     /// This is the payload that is sent in the with EventSource.Write
     /// </summary>
     [EventData]
-    internal class IncrementingEventCounterPayloadType
+    internal sealed class IncrementingEventCounterPayloadType
     {
         public IncrementingEventCounterPayloadType(IncrementingCounterPayload payload) { Payload = payload; }
         public IncrementingCounterPayload Payload { get; set; }

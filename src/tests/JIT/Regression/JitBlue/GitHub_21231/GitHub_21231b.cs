@@ -1,7 +1,11 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_21231b;
+
 using System;
+using Xunit;
 
 // Test case for https://github.com/dotnet/coreclr/issues/21231
 //
@@ -38,7 +42,8 @@ struct S2
 
 public class Program
 {
-    public static int Main()
+    [Fact]
+    public static int TestEntryPoint()
     {
         var vr22 = new S2[]{new S2(new S0(1))};
         S2 vr26;

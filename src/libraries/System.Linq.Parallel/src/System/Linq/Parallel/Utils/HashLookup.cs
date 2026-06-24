@@ -17,12 +17,11 @@ namespace System.Linq.Parallel
     /// </summary>
     /// <typeparam name="TKey">The kind of keys contained within.</typeparam>
     /// <typeparam name="TValue">The kind of values contained within.</typeparam>
-    internal class HashLookup<TKey, TValue>
+    internal sealed class HashLookup<TKey, TValue>
     {
         private int[] buckets;
         private Slot[] slots;
         private int count;
-        private int freeList;
         private readonly IEqualityComparer<TKey>? comparer;
 
         private const int HashCodeMask = 0x7fffffff;
@@ -36,7 +35,6 @@ namespace System.Linq.Parallel
             this.comparer = comparer;
             buckets = new int[7];
             slots = new Slot[7];
-            freeList = -1;
         }
 
         // If value is not in set, add it and return true; otherwise return false
@@ -78,7 +76,7 @@ namespace System.Linq.Parallel
         {
             int hashCode = GetKeyHashCode(key);
 
-            for (int i = buckets[hashCode % buckets.Length] - 1; i >= 0; i = slots[i].next)
+            for (int i = buckets[(uint)hashCode % buckets.Length] - 1; i >= 0; i = slots[i].next)
             {
                 if (slots[i].hashCode == hashCode && AreKeysEqual(slots[i].key, key))
                 {
@@ -97,18 +95,10 @@ namespace System.Linq.Parallel
 
             if (add)
             {
-                int index;
-                if (freeList >= 0)
-                {
-                    index = freeList;
-                    freeList = slots[index].next;
-                }
-                else
-                {
-                    if (count == slots.Length) Resize();
-                    index = count;
-                    count++;
-                }
+                if (count == slots.Length) Resize();
+
+                int index = count;
+                count++;
 
                 int bucket = hashCode % buckets.Length;
                 slots[index].hashCode = hashCode;

@@ -2,19 +2,26 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 //
 
+
+namespace GitHub_22556;
+
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 
-public class Test
+public class Test_GitHub_22556
 {
     int f;
 
-    Test(int f)
+    public Test_GitHub_22556() { }
+
+    Test_GitHub_22556(int f)
     {
         this.f = f;
     }
 
-    public static int Main()
+    [Fact]
+    public static int TestEntryPoint()
     {
         try
         {
@@ -33,7 +40,7 @@ public class Test
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    static int Add(Test t, int i)
+    static int Add(Test_GitHub_22556 t, int i)
     {
         // When t is null and i is 0, this should throw
         // NullReferenceException since the operands of

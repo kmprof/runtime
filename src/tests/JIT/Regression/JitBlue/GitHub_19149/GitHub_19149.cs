@@ -29,9 +29,13 @@
 //
 // Yes, this code is evil; it is for a very specific optimized scenario.
 
+
+namespace GitHub_19149;
+
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Xunit;
 
 unsafe struct CommandBytes : IEquatable<CommandBytes>
 {
@@ -142,9 +146,10 @@ unsafe struct CommandBytes : IEquatable<CommandBytes>
     }
 }
 
-static class Program
+public static class Program
 {
-    static int Main()
+    [Fact]
+    public static int TestEntryPoint()
     {
         var lookup = new Dictionary<CommandBytes, string>();
         void Add(string val)

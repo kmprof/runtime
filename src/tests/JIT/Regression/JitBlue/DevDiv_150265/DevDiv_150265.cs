@@ -1,20 +1,26 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace DevDiv_150265;
+
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 
-class Program
+public class Program
 {
     static bool flag;
 
-    static int Main(string[] args)
+    [OuterLoop]
+    [Fact]
+    public static int TestEntryPoint()
     {            
         flag = true;
         return Test();
     }
 
-    public static int Test()
+    internal static int Test()
     {
         try
         {
@@ -64,7 +70,7 @@ class Program
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static void ThrowException()
+    internal static void ThrowException()
     {
         if (flag)
         {

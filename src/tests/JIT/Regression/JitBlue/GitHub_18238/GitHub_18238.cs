@@ -1,8 +1,12 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_18238;
+
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 
 // Regression tests for bugs in fgMorphCast and optNarrowTree.
 
@@ -30,9 +34,10 @@ struct S1
     }
 }
 
-static class GitHub_18238
+public static class GitHub_18238
 {
-    static int Main()
+    [Fact]
+    public static int TestEntryPoint()
     {
         bool passed = true;
 

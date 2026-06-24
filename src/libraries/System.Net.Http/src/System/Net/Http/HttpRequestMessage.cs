@@ -1,19 +1,25 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Threading;
-using System.Collections.Generic;
-using System.Diagnostics;
 
 namespace System.Net.Http
 {
     public class HttpRequestMessage : IDisposable
     {
+        internal static Version DefaultRequestVersion => HttpVersion.Version11;
+        internal static HttpVersionPolicy DefaultVersionPolicy => HttpVersionPolicy.RequestVersionOrLower;
+
         private const int MessageNotYetSent = 0;
         private const int MessageAlreadySent = 1;
+        private const int PropagatorStateInjectedByDiagnosticsHandler = 2;
+        private const int MessageDisposed = 4;
+        private const int AuthDisabled = 8;
 
         // Track whether the message has been sent.
         // The message shouldn't be sent again if this field is equal to MessageAlreadySent.
@@ -25,18 +31,14 @@ namespace System.Net.Http
         private Version _version;
         private HttpVersionPolicy _versionPolicy;
         private HttpContent? _content;
-        private bool _disposed;
-        private HttpRequestOptions? _options;
+        internal HttpRequestOptions? _options;
 
         public Version Version
         {
             get { return _version; }
             set
             {
-                if (value == null)
-                {
-                    throw new ArgumentNullException(nameof(value));
-                }
+                ArgumentNullException.ThrowIfNull(value);
                 CheckDisposed();
 
                 _version = value;
@@ -51,6 +53,11 @@ namespace System.Net.Http
             get { return _versionPolicy; }
             set
             {
+                if ((uint)value > (uint)HttpVersionPolicy.RequestVersionExact)
+                {
+                    throw new ArgumentException(SR.Format(SR.net_invalid_enum, nameof(HttpVersionPolicy)), nameof(value));
+                }
+
                 CheckDisposed();
 
                 _versionPolicy = value;
@@ -86,10 +93,7 @@ namespace System.Net.Http
             get { return _method; }
             set
             {
-                if (value == null)
-                {
-                    throw new ArgumentNullException(nameof(value));
-                }
+                ArgumentNullException.ThrowIfNull(value);
                 CheckDisposed();
 
                 _method = value;
@@ -101,35 +105,21 @@ namespace System.Net.Http
             get { return _requestUri; }
             set
             {
-                if ((value != null) && (value.IsAbsoluteUri) && (!HttpUtilities.IsHttpUri(value)))
-                {
-                    throw new ArgumentException(HttpUtilities.InvalidUriMessage, nameof(value));
-                }
                 CheckDisposed();
-
-                // It's OK to set 'null'. HttpClient will add the 'BaseAddress'. If there is no 'BaseAddress'
-                // sending this message will throw.
                 _requestUri = value;
             }
         }
 
-        public HttpRequestHeaders Headers
-        {
-            get
-            {
-                if (_headers == null)
-                {
-                    _headers = new HttpRequestHeaders();
-                }
-                return _headers;
-            }
-        }
+        public HttpRequestHeaders Headers => _headers ??= new HttpRequestHeaders();
 
         internal bool HasHeaders => _headers != null;
 
-        [Obsolete("Use Options instead.")]
+        [Obsolete("HttpRequestMessage.Properties has been deprecated. Use Options instead.")]
         public IDictionary<string, object?> Properties => Options;
 
+        /// <summary>
+        /// Gets the collection of options to configure the HTTP request.
+        /// </summary>
         public HttpRequestOptions Options => _options ??= new HttpRequestOptions();
 
         public HttpRequestMessage()
@@ -139,71 +129,75 @@ namespace System.Net.Http
 
         public HttpRequestMessage(HttpMethod method, Uri? requestUri)
         {
-            InitializeValues(method, requestUri);
-        }
+            ArgumentNullException.ThrowIfNull(method);
 
-        public HttpRequestMessage(HttpMethod method, string? requestUri)
-        {
             // It's OK to have a 'null' request Uri. If HttpClient is used, the 'BaseAddress' will be added.
             // If there is no 'BaseAddress', sending this request message will throw.
             // Note that we also allow the string to be empty: null and empty are considered equivalent.
-            if (string.IsNullOrEmpty(requestUri))
-            {
-                InitializeValues(method, null);
-            }
-            else
-            {
-                InitializeValues(method, new Uri(requestUri, UriKind.RelativeOrAbsolute));
-            }
+            _method = method;
+            _requestUri = requestUri;
+            _version = DefaultRequestVersion;
+            _versionPolicy = DefaultVersionPolicy;
+        }
+
+        public HttpRequestMessage(HttpMethod method, [StringSyntax(StringSyntaxAttribute.Uri)] string? requestUri)
+            : this(method, string.IsNullOrEmpty(requestUri) ? null : new Uri(requestUri, UriKind.RelativeOrAbsolute))
+        {
         }
 
         public override string ToString()
         {
-            StringBuilder sb = new StringBuilder();
+            ValueStringBuilder sb = new ValueStringBuilder(stackalloc char[512]);
 
             sb.Append("Method: ");
-            sb.Append(_method);
+            sb.Append(_method.ToString());
 
             sb.Append(", RequestUri: '");
-            sb.Append(_requestUri == null ? "<null>" : _requestUri.ToString());
+            if (_requestUri is null)
+            {
+                sb.Append("<null>");
+            }
+            else
+            {
+                sb.AppendSpanFormattable(_requestUri);
+            }
 
             sb.Append("', Version: ");
-            sb.Append(_version);
+            sb.AppendSpanFormattable(_version);
 
             sb.Append(", Content: ");
             sb.Append(_content == null ? "<null>" : _content.GetType().ToString());
 
-            sb.AppendLine(", Headers:");
-            HeaderUtilities.DumpHeaders(sb, _headers, _content?.Headers);
+            sb.Append(", Headers:");
+            sb.Append(Environment.NewLine);
+            HeaderUtilities.DumpHeaders(ref sb, _headers, _content?.Headers);
 
             return sb.ToString();
         }
 
-        [MemberNotNull(nameof(_method))]
-        [MemberNotNull(nameof(_version))]
-        private void InitializeValues(HttpMethod method, Uri? requestUri)
-        {
-            if (method is null)
-            {
-                throw new ArgumentNullException(nameof(method));
-            }
-            if ((requestUri != null) && (requestUri.IsAbsoluteUri) && (!HttpUtilities.IsHttpUri(requestUri)))
-            {
-                throw new ArgumentException(HttpUtilities.InvalidUriMessage, nameof(requestUri));
-            }
+        internal bool MarkAsSent() => Interlocked.CompareExchange(ref _sendStatus, MessageAlreadySent, MessageNotYetSent) == MessageNotYetSent;
 
-            _method = method;
-            _requestUri = requestUri;
-            _version = HttpUtilities.DefaultRequestVersion;
-            _versionPolicy = HttpUtilities.DefaultVersionPolicy;
+        internal bool WasSentByHttpClient() => (_sendStatus & MessageAlreadySent) != 0;
+
+        internal void MarkPropagatorStateInjectedByDiagnosticsHandler() => _sendStatus |= PropagatorStateInjectedByDiagnosticsHandler;
+
+        internal bool WasPropagatorStateInjectedByDiagnosticsHandler() => (_sendStatus & PropagatorStateInjectedByDiagnosticsHandler) != 0;
+
+        internal void DisableAuth() => _sendStatus |= AuthDisabled;
+
+        internal bool IsAuthDisabled() => (_sendStatus & AuthDisabled) != 0;
+
+        private bool Disposed
+        {
+            get => (_sendStatus & MessageDisposed) != 0;
+            set
+            {
+                Debug.Assert(value);
+                _sendStatus |= MessageDisposed;
+            }
         }
 
-        internal bool MarkAsSent()
-        {
-            return Interlocked.Exchange(ref _sendStatus, MessageAlreadySent) == MessageNotYetSent;
-        }
-
-        internal bool WasSentByHttpClient() => _sendStatus == MessageAlreadySent;
+        internal bool IsExtendedConnectRequest => Method == HttpMethod.Connect && _headers?.Protocol != null;
 
         #region IDisposable Members
 
@@ -211,13 +205,10 @@ namespace System.Net.Http
         {
             // The reason for this type to implement IDisposable is that it contains instances of types that implement
             // IDisposable (content).
-            if (disposing && !_disposed)
+            if (disposing && !Disposed)
             {
-                _disposed = true;
-                if (_content != null)
-                {
-                    _content.Dispose();
-                }
+                Disposed = true;
+                _content?.Dispose();
             }
         }
 
@@ -231,10 +222,7 @@ namespace System.Net.Http
 
         private void CheckDisposed()
         {
-            if (_disposed)
-            {
-                throw new ObjectDisposedException(this.GetType().ToString());
-            }
+            ObjectDisposedException.ThrowIf(Disposed, this);
         }
     }
 }

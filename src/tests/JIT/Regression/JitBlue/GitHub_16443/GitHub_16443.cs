@@ -1,10 +1,14 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_16443;
+
 using System;
 using System.Numerics;
+using Xunit;
 
-class Program
+public class Program
 {
     struct vec2
     {
@@ -12,7 +16,8 @@ class Program
         public vec2(float x, float y) => value = new Vector2(x, y);
     }
 
-    static int Main()
+    [Fact]
+    public static int TestEntryPoint()
     {
         var a = new vec2(0.42f, 0.24f);
         var b = new vec2(0.42f, 0.24f);

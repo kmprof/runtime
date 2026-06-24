@@ -1,13 +1,18 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_19674;
+
 using System;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using Xunit;
 
-static class GitHub_19674
+public static class GitHub_19674
 {
-    static int Main(string[] args)
+    [Fact]
+    public static int TestEntryPoint()
     {
         int returnVal = 100;
         try

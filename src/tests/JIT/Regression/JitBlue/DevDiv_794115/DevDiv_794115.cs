@@ -2,11 +2,17 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 //
 
-using System;
 
-class Repro
+namespace DevDiv_794115_ro;
+
+using System;
+using Xunit;
+
+public class Repro
 {
-    static int Main()
+    [OuterLoop]
+    [Fact]
+    public static int TestEntryPoint()
     {
         // This testcase ensures that we correctly handle static field
         // reads of different size than the destination for mul

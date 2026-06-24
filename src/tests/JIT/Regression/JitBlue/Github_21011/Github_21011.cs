@@ -1,17 +1,21 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace Github_21011;
+
 using System;
 using System.Runtime.CompilerServices;
 using System.Collections.Generic;
+using Xunit;
 
-public class Test
+public class Test_Github_21011
 {
-    public static int Main()
+    [Fact]
+    public static void TestEntryPoint()
     {
-        Test test = new Test();
+        Test_Github_21011 test = new Test_Github_21011();
         test.GetPair();
-        return 100;
     }
 
     [MethodImpl(MethodImplOptions.Synchronized | MethodImplOptions.NoInlining)]

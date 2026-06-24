@@ -1,12 +1,16 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using System.Data;
+using System.Diagnostics.CodeAnalysis;
 using System.Xml.XPath;
 
 #pragma warning disable 0618 // ignore obsolete warning about XmlDataDocument
 
 namespace System.Xml
 {
+    [RequiresUnreferencedCode(DataSet.RequiresUnreferencedCodeMessage)]
+    [RequiresDynamicCode(DataSet.RequiresDynamicCodeMessage)]
     internal sealed class DataDocumentXPathNavigator : XPathNavigator, IHasXmlNode
     {
         private readonly XPathNodePointer _curNode; //pointer to remember the current node position
@@ -26,6 +30,7 @@ namespace System.Xml
             _temp = other._temp.Clone(this);
             _doc = other._doc;
         }
+
         public override XPathNavigator Clone() => new DataDocumentXPathNavigator(this);
 
         internal XPathNodePointer CurNode => _curNode;
@@ -62,7 +67,7 @@ namespace System.Xml
         // Attributes
         public override bool HasAttributes => _curNode.AttributeCount > 0;
 
-        public override string GetAttribute(string localName, string namespaceURI)
+       public override string GetAttribute(string localName, string namespaceURI)
         {
             if (_curNode.NodeType != XPathNodeType.Element)
             {

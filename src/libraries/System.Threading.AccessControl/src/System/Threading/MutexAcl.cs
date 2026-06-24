@@ -31,11 +31,7 @@ namespace System.Threading
 
             fixed (byte* pSecurityDescriptor = mutexSecurity.GetSecurityDescriptorBinaryForm())
             {
-                var secAttrs = new Interop.Kernel32.SECURITY_ATTRIBUTES
-                {
-                    nLength = (uint)sizeof(Interop.Kernel32.SECURITY_ATTRIBUTES),
-                    lpSecurityDescriptor = (IntPtr)pSecurityDescriptor
-                };
+                Interop.Kernel32.SECURITY_ATTRIBUTES secAttrs = Interop.Kernel32.SECURITY_ATTRIBUTES.Create(pSecurityDescriptor);
 
                 SafeWaitHandle handle = Interop.Kernel32.CreateMutexEx(
                     (IntPtr)(&secAttrs),
@@ -44,7 +40,7 @@ namespace System.Threading
                     (uint)MutexRights.FullControl // Equivalent to MUTEX_ALL_ACCESS
                 );
 
-                int errorCode = Marshal.GetLastWin32Error();
+                int errorCode = Marshal.GetLastPInvokeError();
 
                 if (handle.IsInvalid)
                 {
@@ -117,10 +113,8 @@ namespace System.Threading
 
         private static OpenExistingResult OpenExistingWorker(string name, MutexRights rights, out Mutex? result)
         {
-            if (name == null)
-            {
-                throw new ArgumentNullException(nameof(name));
-            }
+            ArgumentNullException.ThrowIfNull(name);
+
             if (name.Length == 0)
             {
                 throw new ArgumentException(SR.Argument_EmptyName, nameof(name));
@@ -129,9 +123,10 @@ namespace System.Threading
             result = null;
             SafeWaitHandle existingHandle = Interop.Kernel32.OpenMutex((uint)rights, false, name);
 
-            int errorCode = Marshal.GetLastWin32Error();
+            int errorCode = Marshal.GetLastPInvokeError();
             if (existingHandle.IsInvalid)
             {
+                existingHandle.Dispose();
                 return errorCode switch
                 {
                     Interop.Errors.ERROR_FILE_NOT_FOUND or Interop.Errors.ERROR_INVALID_NAME => OpenExistingResult.NameNotFound,

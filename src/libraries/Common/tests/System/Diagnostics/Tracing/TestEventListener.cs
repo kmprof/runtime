@@ -23,15 +23,20 @@ namespace System.Diagnostics.Tracing
         private Action<EventWrittenEventArgs> _eventWritten;
         private readonly List<EventSource> _eventSourceList = new List<EventSource>();
 
-        public TestEventListener(string targetSourceName, EventLevel level, double? eventCounterInterval = null)
+        public TestEventListener(double? eventCounterInterval = null)
         {
             _eventCounterInterval = eventCounterInterval;
+        }
+
+        public TestEventListener(string targetSourceName, EventLevel level, double? eventCounterInterval = null)
+            : this(eventCounterInterval)
+        {
             AddSource(targetSourceName, level);
         }
 
         public TestEventListener(Guid targetSourceGuid, EventLevel level, double? eventCounterInterval = null)
+            : this(eventCounterInterval)
         {
-            _eventCounterInterval = eventCounterInterval;
             AddSource(targetSourceGuid, level);
         }
 
@@ -43,6 +48,7 @@ namespace System.Diagnostics.Tracing
 
         private void AddSource(string name, Guid? guid, EventLevel level, EventKeywords keywords)
         {
+            EventSource sourceToEnable = null;
             lock (_eventSourceList)
             {
                 var settings = new Settings()
@@ -61,9 +67,15 @@ namespace System.Diagnostics.Tracing
                 {
                     if (name == source.Name || guid == source.Guid)
                     {
-                        EnableEventSource(source, level, keywords);
+                        sourceToEnable = source;
+                        break;
                     }
                 }
+            }
+
+            if (sourceToEnable != null)
+            {
+                EnableEventSource(sourceToEnable, level, keywords);
             }
         }
 
@@ -72,15 +84,17 @@ namespace System.Diagnostics.Tracing
 
         protected override void OnEventSourceCreated(EventSource eventSource)
         {
+            bool shouldEnable = false;
+            Settings settings;
             lock (_eventSourceList)
             {
                 _eventSourceList.Add(eventSource);
+                shouldEnable = _names.TryGetValue(eventSource.Name, out settings) || _guids.TryGetValue(eventSource.Guid, out settings);
+            }
 
-                if (_names.TryGetValue(eventSource.Name, out Settings settings) ||
-                    _guids.TryGetValue(eventSource.Guid, out settings))
-                {
-                    EnableEventSource(eventSource, settings.Level, settings.Keywords);
-                }
+            if (shouldEnable)
+            {
+                EnableEventSource(eventSource, settings.Level, settings.Keywords);
             }
         }
 

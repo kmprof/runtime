@@ -1,31 +1,46 @@
-cmake_minimum_required(VERSION 3.14.5)
-
 project(Profiler)
 
 set(SOURCES
-    gcbasicprofiler/gcbasicprofiler.cpp
-    gcprofiler/gcprofiler.cpp
-    rejitprofiler/rejitprofiler.cpp
-    rejitprofiler/ilrewriter.cpp
-    rejitprofiler/sigparse.cpp
+    assemblyprofiler/assemblyprofiler.cpp
+    classload/classload.cpp
+    dynamicjitoptimization/dynamicjitoptimization.cpp
+    eltprofiler/slowpatheltprofiler.cpp
+    enumthreadsprofiler/enumthreadsprofiler.cpp
     eventpipeprofiler/eventpipereadingprofiler.cpp
     eventpipeprofiler/eventpipewritingprofiler.cpp
     eventpipeprofiler/eventpipemetadatareader.cpp
-    metadatagetdispenser/metadatagetdispenser.cpp
+    exceptionprofiler/exceptionprofiler.cpp
+    gcallocateprofiler/gcallocateprofiler.cpp
+    gcbasicprofiler/gcbasicprofiler.cpp
+    gcheapenumerationprofiler/gcheapenumerationprofiler.cpp
+    gcheapenumerationprofiler/gcheapenumerationprofiler.def
+    gcprofiler/gcprofiler.cpp
+    gcskipobjectsallocatedbyclasscallbackprofiler/gcskipobjectsallocatedbyclasscallbackprofiler.cpp
     getappdomainstaticaddress/getappdomainstaticaddress.cpp
-    eltprofiler/slowpatheltprofiler.cpp
+    handlesprofiler/handlesprofiler.cpp
+    inlining/inlining.cpp
+    metadatagetdispenser/metadatagetdispenser.cpp
+    moduleload/moduleload.cpp
+    multiple/multiple.cpp
+    nongcheap/nongcheap.cpp
+    nullprofiler/nullprofiler.cpp
+    rejitprofiler/rejitprofiler.cpp
+    rejitprofiler/ilrewriter.cpp
+    rejitprofiler/sigparse.cpp
     releaseondetach/releaseondetach.cpp
+    transitions/transitions.cpp
     profiler.def
     profiler.cpp
     classfactory.cpp
     dllmain.cpp
     guids.cpp)
 
-include_directories(../../../coreclr/src/pal/prebuilt/inc)
+include_directories(../../../coreclr/pal/prebuilt/inc)
+
+add_compile_definitions(SOS_INCLUDE)
 
 if(NOT WIN32)
-    include_directories(../../../coreclr/src/pal/inc/rt ../../../coreclr/src/pal/inc ../../../coreclr/src/inc)
-    add_compile_options(-DPAL_STDCPP_COMPAT)
+    include_directories(../../../coreclr/pal/inc/rt ../../../coreclr/pal/inc ../../../coreclr/inc)
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         add_compile_options(-Wno-null-arithmetic)
     else(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -39,10 +54,10 @@ add_library(Profiler SHARED ${SOURCES})
 if(WIN32)
 	set(DEPENDENCIES Advapi32.lib oleaut32.lib Ole32.lib)
 else(WIN32)
-    set(DEPENDENCIES pthread dl)
+    set(DEPENDENCIES pthread ${CMAKE_DL_LIBS})
 endif(WIN32)
 
-target_link_libraries(Profiler PUBLIC ${DEPENDENCIES})
+target_link_libraries(Profiler PUBLIC ${DEPENDENCIES} ${LINK_LIBRARIES_ADDITIONAL})
 
 # add the install targets
 install(TARGETS Profiler DESTINATION bin)

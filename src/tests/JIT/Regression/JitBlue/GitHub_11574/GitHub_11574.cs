@@ -1,9 +1,13 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-using System.Runtime.CompilerServices;
 
-class Program
+namespace GitHub_11574;
+
+using System.Runtime.CompilerServices;
+using Xunit;
+
+public class Program
 {
     static byte[] s_arr2;
     static byte[] s_arr3;
@@ -20,7 +24,9 @@ class Program
         return (actual == expected) ? rv : 0;
     }
 
-    static int Main(string[] args)
+    [OuterLoop]
+    [Fact]
+    public static int TestEntryPoint()
     {
         Init();
 

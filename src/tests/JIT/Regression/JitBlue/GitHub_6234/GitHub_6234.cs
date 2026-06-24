@@ -4,12 +4,17 @@
 // Repro for a failure to hoist an invariant expression due to bad
 // interaction between CSE and constant prop.
 
-using System;
 
-internal class Program
+namespace GitHub_6234;
+
+using System;
+using Xunit;
+
+public class Program
 {
     public static int ii;
-    private static int Main(string[] args)
+    [Fact]
+    public static int TestEntryPoint()
     {
         int res = 0;
         ii = 99;

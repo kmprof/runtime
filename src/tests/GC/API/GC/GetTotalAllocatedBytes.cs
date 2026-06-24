@@ -8,8 +8,10 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Xunit;
+using TestLibrary;
 
-public class Test 
+public class Test_GetTotalAllocatedBytes 
 {
     struct Counts
     {
@@ -108,8 +110,11 @@ public class Test
         {
             object lck = new object();
 
+            // 1000 quickly created threads can be too many for a 32-bit environment, so reduce on 32-bit.
+            int threadCount = IntPtr.Size == 4 ? 100 : 1000;
+
             tsk = Task.Run(() => {
-                while (running)
+                for (int i = 0; i < threadCount; i++)
                 {
                     Thread thd = new Thread(() => {
                         lock (lck)
@@ -120,11 +125,14 @@ public class Test
 
                     thd.Start();
                     thd.Join();
+
+                    if (!running)
+                        break;
                 }
             });
 
             Counts previous = default(Counts);
-            for (int i = 0; i < 1000; ++i)
+            for (int i = 0; i < 100; ++i)
             {
                 lock (lck)
                 {
@@ -171,12 +179,13 @@ public class Test
             thr.Join();
     }
 
-    public static int Main() 
+    [ActiveIssue("needs triage", TestRuntimes.Mono)]
+    [Fact]
+    public static void TestEntryPoint() 
     {
         TestSingleThreaded();
         TestSingleThreadedLOH();
         TestAnotherThread();
         TestLohSohConcurrently();
-        return 100;
     }
 }

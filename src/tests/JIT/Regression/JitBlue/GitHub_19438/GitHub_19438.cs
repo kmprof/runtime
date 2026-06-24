@@ -6,6 +6,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Collections.Generic;
 using System.Diagnostics;
+using Xunit;
 
 // This test executes the same computation on a wrapped Vector4 ('float4') and a
 // (not wrapped) Vector4. The code should be similar.
@@ -14,7 +15,7 @@ using System.Diagnostics;
 
 namespace GitHub_19438
 {
-    class Program
+    public class Program
     {
         struct float4
         {
@@ -63,10 +64,12 @@ namespace GitHub_19438
             }
         }
 
-        static int Main(string[] args)
+        [Fact]
+        public static void TestEntryPoint()
         {
             const int iterationCount = 10;
-            const int itemCount = 1000000;
+            // WASM-TODO: active issue https://github.com/dotnet/runtime/issues/124218
+            int itemCount = TestLibrary.PlatformDetection.IsWasm ? 1000 : 1000000;
 
             long totalTaskTime = 0;
 
@@ -118,8 +121,6 @@ namespace GitHub_19438
                 GC.Collect();
             }
             Console.WriteLine("Vector4 Average Time: " + totalTaskTime / iterationCount + "ms");
-
-            return 100;
         }
     }
 }

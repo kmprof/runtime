@@ -5,8 +5,9 @@
 
 using System;
 using System.Collections;
+using Xunit;
 
-public class Test {
+public class Test_keepalivefinalize {
 	
 	public class Dummy1 {
 		public static bool visited;
@@ -29,7 +30,8 @@ public class Test {
 		}
 	}
 
-	public static int Main() {
+	[Fact]
+	public static int TestEntryPoint() {
 
         int returnValue = 0;
 		Dummy1 obj = new Dummy1();

@@ -74,7 +74,7 @@ namespace System.Runtime.Loader.Tests
             }
         }
 
-        [Theory]
+        [ConditionalTheory(typeof(PlatformDetection), nameof(PlatformDetection.HasAssemblyFiles))]
         [MemberData(nameof(MainResources_TestData))]
         public static void mainResources(string lang, string expected)
         {
@@ -131,7 +131,7 @@ namespace System.Runtime.Loader.Tests
             yield return new object[] { "ReferencedClassLibNeutralIsSatellite", "ReferencedClassLibNeutralIsSatellite.Program, ReferencedClassLibNeutralIsSatellite", "es",      "Neutral (es) language ReferencedClassLibNeutralIsSatellite description 1.0.0" };
         }
 
-        [ConditionalTheory(typeof(PlatformDetection), nameof(PlatformDetection.IsNotInvariantGlobalization))]
+        [ConditionalTheory(typeof(PlatformDetection), nameof(PlatformDetection.IsNotInvariantGlobalization), nameof(PlatformDetection.HasAssemblyFiles))]
         [MemberData(nameof(DescribeLib_TestData))]
         public void describeLib(string alc, string type, string culture, string expected)
         {
@@ -187,9 +187,8 @@ namespace System.Runtime.Loader.Tests
             yield return new object[] { "ReferencedClassLibNeutralIsSatellite", "ReferencedClassLibNeutralIsSatellite", "es" };
         }
 
-        [ConditionalTheory(typeof(PlatformDetection), nameof(PlatformDetection.IsNotInvariantGlobalization))]
+        [ConditionalTheory(typeof(PlatformDetection), nameof(PlatformDetection.IsNotInvariantGlobalization), nameof(PlatformDetection.HasAssemblyFiles))]
         [MemberData(nameof(SatelliteLoadsCorrectly_TestData))]
-        [ActiveIssue("https://github.com/dotnet/runtime/issues/43103", TestPlatforms.Browser)]
         public void SatelliteLoadsCorrectly_FromName(string alc, string assemblyName, string culture)
         {
             AssemblyName satelliteAssemblyName = new AssemblyName(assemblyName + ".resources");
@@ -208,8 +207,8 @@ namespace System.Runtime.Loader.Tests
 
             Assert.Equal(culture, satelliteAssembly.GetName().CultureName);
         }
-        
-        [ConditionalTheory(typeof(PlatformDetection), nameof(PlatformDetection.IsNotInvariantGlobalization))]
+
+        [ConditionalTheory(typeof(PlatformDetection), nameof(PlatformDetection.IsNotInvariantGlobalization), nameof(PlatformDetection.HasAssemblyFiles))]
         [MemberData(nameof(SatelliteLoadsCorrectly_TestData))]
         public void SatelliteLoadsCorrectly_FromPath(string alc, string assemblyName, string culture)
         {

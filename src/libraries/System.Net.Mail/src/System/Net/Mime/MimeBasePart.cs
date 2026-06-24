@@ -2,15 +2,16 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.Collections.Specialized;
-using System.Text;
 using System.Net.Mail;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace System.Net.Mime
 {
-    internal class MimeBasePart
+    internal abstract class MimeBasePart
     {
         internal const string DefaultCharSet = "utf-8";
-        private static readonly char[] s_decodeEncodingSplitChars = new char[] { '?', '\r', '\n' };
 
         protected ContentType? _contentType;
         protected ContentDisposition? _contentDisposition;
@@ -36,15 +37,13 @@ namespace System.Net.Mime
 
             encoding ??= Encoding.GetEncoding(DefaultCharSet);
 
-            EncodedStreamFactory factory = new EncodedStreamFactory();
-            IEncodableStream stream = factory.GetEncoderForHeader(encoding, base64Encoding, headerLength);
+            IEncodableStream stream = EncodedStreamFactory.GetEncoderForHeader(encoding, base64Encoding, headerLength);
 
             stream.EncodeString(value, encoding);
             return stream.GetEncodedString();
         }
 
         private static readonly char[] s_headerValueSplitChars = new char[] { '\r', '\n', ' ' };
-        private static readonly char[] s_questionMarkSplitChars = new char[] { '?' };
 
         internal static string DecodeHeaderValue(string? value)
         {
@@ -66,7 +65,7 @@ namespace System.Net.Mime
                 //the third is the unicode encoding type, and the fourth is encoded message itself.  '?' is not valid inside of
                 //an encoded string other than as a separator for these five parts.
                 //If this check fails, the string is either not encoded or cannot be decoded by this method
-                string[] subStrings = foldedSubString.Split(s_questionMarkSplitChars);
+                string[] subStrings = foldedSubString.Split('?');
                 if ((subStrings.Length != 5 || subStrings[0] != "=" || subStrings[4] != "="))
                 {
                     return value;
@@ -77,10 +76,9 @@ namespace System.Net.Mime
                 byte[] buffer = Encoding.ASCII.GetBytes(subStrings[3]);
                 int newLength;
 
-                EncodedStreamFactory encoderFactory = new EncodedStreamFactory();
-                IEncodableStream s = encoderFactory.GetEncoderForHeader(Encoding.GetEncoding(charSet), base64Encoding, 0);
+                IEncodableStream s = EncodedStreamFactory.GetEncoderForHeader(Encoding.GetEncoding(charSet), base64Encoding, 0);
 
-                newLength = s.DecodeBytes(buffer, 0, buffer.Length);
+                newLength = s.DecodeBytes(buffer);
 
                 Encoding encoding = Encoding.GetEncoding(charSet);
                 newValue += encoding.GetString(buffer, 0, newLength);
@@ -92,42 +90,30 @@ namespace System.Net.Mime
         // "=?utf-8?B?RmlsZU5hbWVf55CG0Y3Qq9C60I5jw4TRicKq0YIM0Y1hSsSeTNCy0Klh?="; // 3.5
         // With the addition of folding in 4.0, there may be multiple lines with encoding, only detect the first:
         // "=?utf-8?B?RmlsZU5hbWVf55CG0Y3Qq9C60I5jw4TRicKq0YIM0Y1hSsSeTNCy0Klh?=\r\n =?utf-8?B??=";
-        internal static Encoding? DecodeEncoding(string? value)
+        internal static unsafe Encoding? DecodeEncoding(string? value)
         {
             if (string.IsNullOrEmpty(value))
             {
                 return null;
             }
 
-            string[] subStrings = value.Split(s_decodeEncodingSplitChars);
-            if ((subStrings.Length < 5 || subStrings[0] != "=" || subStrings[4] != "="))
+            ReadOnlySpan<char> valueSpan = value;
+            Span<Range> subStrings = stackalloc Range[6];
+            if (valueSpan.SplitAny(subStrings, "?\r\n") < 5 ||
+                valueSpan[subStrings[0]] is not "=" ||
+                valueSpan[subStrings[4]] is not "=")
             {
                 return null;
             }
 
-            string charSet = subStrings[1];
-            return Encoding.GetEncoding(charSet);
+            return Encoding.GetEncoding(value[subStrings[1]]);
         }
 
         internal static bool IsAscii(string value, bool permitCROrLF)
         {
-            if (value == null)
-            {
-                throw new ArgumentNullException(nameof(value));
-            }
+            ArgumentNullException.ThrowIfNull(value);
 
-            foreach (char c in value)
-            {
-                if (c > 0x7f)
-                {
-                    return false;
-                }
-                if (!permitCROrLF && (c == '\r' || c == '\n'))
-                {
-                    return false;
-                }
-            }
-            return true;
+            return Ascii.IsValid(value) && (permitCROrLF || !value.AsSpan().ContainsAny('\r', '\n'));
         }
 
         internal string? ContentID
@@ -167,21 +153,12 @@ namespace System.Net.Mime
             get
             {
                 //persist existing info before returning
-                if (_headers == null)
-                {
-                    _headers = new HeaderCollection();
-                }
+                _headers ??= new HeaderCollection();
 
-                if (_contentType == null)
-                {
-                    _contentType = new ContentType();
-                }
+                _contentType ??= new ContentType();
                 _contentType.PersistIfNeeded(_headers, false);
 
-                if (_contentDisposition != null)
-                {
-                    _contentDisposition.PersistIfNeeded(_headers, false);
-                }
+                _contentDisposition?.PersistIfNeeded(_headers, false);
 
                 return _headers;
             }
@@ -192,10 +169,7 @@ namespace System.Net.Mime
             get { return _contentType ??= new ContentType(); }
             set
             {
-                if (value == null)
-                {
-                    throw new ArgumentNullException(nameof(value));
-                }
+                ArgumentNullException.ThrowIfNull(value);
 
                 _contentType = value;
                 _contentType.PersistIfNeeded((HeaderCollection)Headers, true);
@@ -214,49 +188,6 @@ namespace System.Net.Mime
             }
         }
 
-        internal virtual void Send(BaseWriter writer, bool allowUnicode)
-        {
-            throw new NotImplementedException();
-        }
-
-        internal virtual IAsyncResult BeginSend(BaseWriter writer, AsyncCallback? callback,
-            bool allowUnicode, object? state)
-        {
-            throw new NotImplementedException();
-        }
-
-        internal void EndSend(IAsyncResult asyncResult)
-        {
-            if (asyncResult == null)
-            {
-                throw new ArgumentNullException(nameof(asyncResult));
-            }
-
-            LazyAsyncResult? castedAsyncResult = asyncResult as MimePartAsyncResult;
-
-            if (castedAsyncResult == null || castedAsyncResult.AsyncObject != this)
-            {
-                throw new ArgumentException(SR.net_io_invalidasyncresult, nameof(asyncResult));
-            }
-
-            if (castedAsyncResult.EndCalled)
-            {
-                throw new InvalidOperationException(SR.Format(SR.net_io_invalidendcall, nameof(EndSend)));
-            }
-
-            castedAsyncResult.InternalWaitForCompletion();
-            castedAsyncResult.EndCalled = true;
-            if (castedAsyncResult.Result is Exception)
-            {
-                throw (Exception)castedAsyncResult.Result;
-            }
-        }
-
-        internal class MimePartAsyncResult : LazyAsyncResult
-        {
-            internal MimePartAsyncResult(MimeBasePart part, object? state, AsyncCallback? callback) : base(part, state, callback)
-            {
-            }
-        }
+        internal abstract Task SendAsync<TIOAdapter>(BaseWriter writer, bool allowUnicode, CancellationToken cancellationToken) where TIOAdapter : IReadWriteAdapter;
     }
 }

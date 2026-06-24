@@ -1,10 +1,14 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_18408;
+
 using System;
 using System.Reflection;
 using System.Threading;
 using System.Runtime.CompilerServices;
+using Xunit;
 
 class MetadataReader
 {
@@ -96,7 +100,7 @@ struct QMethodDefinition
     public MethodHandle NativeFormatHandle { get { return _handle.AsHandle().ToMethodHandle(NativeFormatReader); } }
 }
 
-class GitHub_18408
+public class GitHub_18408
 {
     [MethodImpl(MethodImplOptions.NoInlining)]
     static object foo(QMethodDefinition methodHandle)
@@ -105,7 +109,8 @@ class GitHub_18408
         return (method.Flags != (MethodAttributes)0) ? new object() : null;
     }
 
-    public static int Main(string[] args)
+    [Fact]
+    public static int TestEntryPoint()
     {
         MetadataReader r = new MetadataReader();
 

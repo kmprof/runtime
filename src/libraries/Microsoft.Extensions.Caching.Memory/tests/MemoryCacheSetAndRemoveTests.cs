@@ -11,9 +11,9 @@ namespace Microsoft.Extensions.Caching.Memory
 {
     public class MemoryCacheSetAndRemoveTests
     {
-        private static IMemoryCache CreateCache()
+        private static IMemoryCache CreateCache(bool trackLinkedCacheEntries = false)
         {
-            return new MemoryCache(new MemoryCacheOptions());
+            return new MemoryCache(new MemoryCacheOptions { TrackLinkedCacheEntries = trackLinkedCacheEntries });
         }
 
         [Fact]
@@ -164,10 +164,12 @@ namespace Microsoft.Extensions.Caching.Memory
             Assert.Same(obj, result);
         }
 
-        [Fact]
-        public void GetOrCreate_WillNotCreateEmptyValue_WhenFactoryThrows()
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void GetOrCreate_WillNotCreateEmptyValue_WhenFactoryThrows(bool trackLinkedCacheEntries)
         {
-            var cache = CreateCache();
+            var cache = CreateCache(trackLinkedCacheEntries);
             string key = "myKey";
             try
             {
@@ -183,13 +185,15 @@ namespace Microsoft.Extensions.Caching.Memory
             Assert.False(cache.TryGetValue(key, out int obj));
 
             // verify that throwing an exception doesn't leak CacheEntry objects
-            Assert.Null(CacheEntryHelper.Current);
+            Assert.Null(CacheEntry.Current);
         }
 
-        [Fact]
-        public async Task GetOrCreateAsync_WillNotCreateEmptyValue_WhenFactoryThrows()
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public async Task GetOrCreateAsync_WillNotCreateEmptyValue_WhenFactoryThrows(bool trackLinkedCacheEntries)
         {
-            var cache = CreateCache();
+            var cache = CreateCache(trackLinkedCacheEntries);
             string key = "myKey";
             try
             {
@@ -205,26 +209,45 @@ namespace Microsoft.Extensions.Caching.Memory
             Assert.False(cache.TryGetValue(key, out int obj));
 
             // verify that throwing an exception doesn't leak CacheEntry objects
-            Assert.Null(CacheEntryHelper.Current);
+            Assert.Null(CacheEntry.Current);
         }
 
-        [Fact]
-        public void DisposingCacheEntryReleasesScope()
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void DisposingCacheEntryReleasesScope(bool trackLinkedCacheEntries)
         {
             object GetScope(ICacheEntry entry)
             {
-                return entry.GetType()
-                    .GetField("_scope", BindingFlags.NonPublic | BindingFlags.Instance)
+                // Use Type.GetType so that trimming can know what type we operate on
+                Type cacheEntryType = Type.GetType("Microsoft.Extensions.Caching.Memory.CacheEntry, Microsoft.Extensions.Caching.Memory");
+                Assert.Equal(cacheEntryType, entry.GetType());
+                return cacheEntryType
+                    .GetField("_previous", BindingFlags.NonPublic | BindingFlags.Instance)
                     .GetValue(entry);
             }
 
-            var cache = CreateCache();
+            var cache = CreateCache(trackLinkedCacheEntries);
 
-            ICacheEntry entry = cache.CreateEntry("myKey");
-            Assert.NotNull(GetScope(entry));
+            ICacheEntry first = cache.CreateEntry("myKey1");
+            Assert.Null(GetScope(first)); // it's the first entry, so it has no previous cache entry set
 
-            entry.Dispose();
-            Assert.Null(GetScope(entry));
+            ICacheEntry second = cache.CreateEntry("myKey2");
+
+            if (trackLinkedCacheEntries)
+            {
+                Assert.NotNull(GetScope(second)); // it's not first, so it has previous set
+                Assert.Same(first, GetScope(second)); // second.previous is set to first
+
+                second.Dispose();
+                Assert.Null(GetScope(second));
+                first.Dispose();
+                Assert.Null(GetScope(first));
+            }
+            else
+            {
+                Assert.Null(GetScope(second)); // tracking not enabled, the scope is null
+            }
         }
 
         [Fact]
@@ -361,6 +384,52 @@ namespace Microsoft.Extensions.Caching.Memory
         }
 
         [Fact]
+        public void ClearClears()
+        {
+            var cache = (MemoryCache)CreateCache();
+            var obj = new object();
+            string[] keys = new string[] { "key1", "key2", "key3", "key4" };
+
+            foreach (string key in keys)
+            {
+                var result = cache.Set(key, obj);
+                Assert.Same(obj, result);
+                Assert.Same(obj, cache.Get(key));
+            }
+
+            cache.Clear();
+
+            Assert.Equal(0, cache.Count);
+            foreach (string key in keys)
+            {
+                Assert.Null(cache.Get(key));
+            }
+        }
+
+        [Fact]
+        public void SetNullCallback_NotAllowed_ArgumentException()
+        {
+            var cache = CreateCache();
+            const string someKey = "test";
+            var entry = cache.CreateEntry(someKey);
+
+            var options = new MemoryCacheEntryOptions();
+
+            var notNullCallback = new PostEvictionCallbackRegistration()
+            {
+                EvictionCallback = (_, _, _, _) => {}
+            };
+
+            options.PostEvictionCallbacks.Add(notNullCallback);
+
+            var nullCallback = new PostEvictionCallbackRegistration();
+
+            options.PostEvictionCallbacks.Add(nullCallback);
+
+            Assert.Throws<ArgumentException>(() => entry.SetOptions(options));
+        }
+
+        [Fact]
         public void RemoveRemovesAndInvokesCallback()
         {
             var cache = CreateCache();
@@ -385,6 +454,38 @@ namespace Microsoft.Extensions.Caching.Memory
             Assert.Same(value, result);
 
             cache.Remove(key);
+            Assert.True(callbackInvoked.WaitOne(TimeSpan.FromSeconds(30)), "Callback");
+
+            result = cache.Get(key);
+            Assert.Null(result);
+        }
+
+        [Fact]
+        public void ClearClearsAndInvokesCallback()
+        {
+            var cache = (MemoryCache)CreateCache();
+            var value = new object();
+            string key = "myKey";
+            var callbackInvoked = new ManualResetEvent(false);
+
+            var options = new MemoryCacheEntryOptions();
+            options.PostEvictionCallbacks.Add(new PostEvictionCallbackRegistration()
+            {
+                EvictionCallback = (subkey, subValue, reason, state) =>
+                {
+                    Assert.Equal(key, subkey);
+                    Assert.Same(value, subValue);
+                    Assert.Equal(EvictionReason.Removed, reason);
+                    var localCallbackInvoked = (ManualResetEvent)state;
+                    localCallbackInvoked.Set();
+                },
+                State = callbackInvoked
+            });
+            var result = cache.Set(key, value, options);
+            Assert.Same(value, result);
+
+            cache.Clear();
+            Assert.Equal(0, cache.Count);
             Assert.True(callbackInvoked.WaitOne(TimeSpan.FromSeconds(30)), "Callback");
 
             result = cache.Get(key);
@@ -468,7 +569,8 @@ namespace Microsoft.Extensions.Caching.Memory
         }
 
         [Fact]
-        [ActiveIssue("https://github.com/dotnet/runtime/issues/33993")]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/72879")] // issue in cache
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/72890")] // issue in test
         public void GetAndSet_AreThreadSafe_AndUpdatesNeverLeavesNullValues()
         {
             var cache = CreateCache();
@@ -522,7 +624,7 @@ namespace Microsoft.Extensions.Caching.Memory
         }
 
         [Fact]
-        [ActiveIssue("https://github.com/dotnet/runtime/issues/33993")]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/72890")]
         public void OvercapacityPurge_AreThreadSafe()
         {
             var cache = new MemoryCache(new MemoryCacheOptions
@@ -582,12 +684,13 @@ namespace Microsoft.Extensions.Caching.Memory
             Assert.Equal(TaskStatus.RanToCompletion, task1.Status);
             Assert.Equal(TaskStatus.RanToCompletion, task2.Status);
             Assert.Equal(TaskStatus.RanToCompletion, task3.Status);
-            Assert.Equal(cache.Count, cache.Size);
+            CapacityTests.AssertCacheSize(cache.Count, cache);
             Assert.InRange(cache.Count, 0, 10);
             Assert.False(limitExceeded);
         }
 
         [Fact]
+        [ActiveIssue("https://github.com/dotnet/runtime/issues/72890")]
         public void AddAndReplaceEntries_AreThreadSafe()
         {
             var cache = new MemoryCache(new MemoryCacheOptions
@@ -643,7 +746,7 @@ namespace Microsoft.Extensions.Caching.Memory
                 cacheSize += cache.Get<int>(i);
             }
 
-            Assert.Equal(cacheSize, cache.Size);
+            CapacityTests.AssertCacheSize(cacheSize, cache);
             Assert.InRange(cache.Count, 0, 20);
         }
 
@@ -689,6 +792,77 @@ namespace Microsoft.Extensions.Caching.Memory
         {
             var cache = CreateCache();
             await Assert.ThrowsAsync<ArgumentNullException>(async () => await cache.GetOrCreateAsync<object>(null, null));
+        }
+
+        [Fact]
+        public void GetOrCreateWithCacheEntryOptions()
+        {
+            var cacheKey = "test";
+            var cache = CreateCache();
+            ManualResetEvent mre = new ManualResetEvent(false);
+
+            var options = new MemoryCacheEntryOptions();
+            options.PostEvictionCallbacks.Add(new PostEvictionCallbackRegistration()
+            {
+                EvictionCallback = (key, value, reason, state) =>
+                {
+                    Assert.Equal(cacheKey, key);
+                    Assert.Equal(cacheKey, value);
+                    Assert.Equal(EvictionReason.Removed, reason);
+                    mre.Set();
+                }
+            });
+
+            var value = cache.GetOrCreate<string>(cacheKey, _ => cacheKey, options);
+            Assert.Equal(cacheKey, value);
+            Assert.True(cache.TryGetValue(cacheKey, out _));
+
+            cache.Remove(cacheKey);
+            Assert.True(mre.WaitOne(TimeSpan.FromSeconds(30)));
+            Assert.False(cache.TryGetValue(cacheKey, out _));
+        }
+
+        [Fact]
+        public async Task GetOrCreateAsyncWithCacheEntryOptions()
+        {
+            var cacheKey = "test";
+            var cache = CreateCache();
+            ManualResetEvent mre = new ManualResetEvent(false);
+
+            var options = new MemoryCacheEntryOptions();
+            options.PostEvictionCallbacks.Add(new PostEvictionCallbackRegistration()
+            {
+                EvictionCallback = (key, value, reason, state) =>
+                {
+                    Assert.Equal(cacheKey, key);
+                    Assert.Equal(cacheKey, value);
+                    Assert.Equal(EvictionReason.Removed, reason);
+                    mre.Set();
+                }
+            });
+
+            var value = await cache.GetOrCreateAsync<string>(cacheKey, _ => Task.FromResult(cacheKey), options);
+            Assert.Equal(cacheKey, value);
+            Assert.True(cache.TryGetValue(cacheKey, out _));
+
+            cache.Remove(cacheKey);
+            Assert.True(mre.WaitOne(TimeSpan.FromSeconds(30)));
+            Assert.False(cache.TryGetValue(cacheKey, out _));
+        }
+
+        [Fact]
+        public void MixedKeysUsage()
+        {
+            // keys are split internally into 2 separate chunks
+            var cache = CreateCache();
+            var typed = Assert.IsType<MemoryCache>(cache);
+            object key0 = 123.45M, key1 = "123.45";
+            cache.Set(key0, "string value");
+            cache.Set(key1, "decimal value");
+
+            Assert.Equal(2, typed.Count);
+            Assert.Equal("string value", cache.Get(key0));
+            Assert.Equal("decimal value", cache.Get(key1));
         }
 
         private class TestKey

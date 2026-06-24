@@ -1,8 +1,6 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-using System.ComponentModel;
-
 namespace System.IO.Compression
 {
     public static partial class ZipFileExtensions
@@ -67,11 +65,8 @@ namespace System.IO.Compression
         /// <param name="overwriteFiles">True to indicate overwrite.</param>
         public static void ExtractToDirectory(this ZipArchive source, string destinationDirectoryName, bool overwriteFiles)
         {
-            if (source == null)
-                throw new ArgumentNullException(nameof(source));
-
-            if (destinationDirectoryName == null)
-                throw new ArgumentNullException(nameof(destinationDirectoryName));
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(destinationDirectoryName);
 
             foreach (ZipArchiveEntry entry in source.Entries)
             {

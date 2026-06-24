@@ -1,7 +1,11 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_12949_1;
+
 using System;
+using Xunit;
 
 public struct S<K>
 {
@@ -39,9 +43,11 @@ public class X<K,V>
     S<K>[] a;
 }
 
-class B
+public class B
 {
-    public static int Main()
+    [OuterLoop]
+    [Fact]
+    public static int TestEntryPoint()
     {
         var a = new X<int, string>(11);
         int z = a.Test();

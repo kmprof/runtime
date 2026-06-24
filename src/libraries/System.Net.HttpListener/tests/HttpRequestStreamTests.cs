@@ -45,7 +45,7 @@ namespace System.Net.Tests
 
             do
             {
-                readLength = await TaskTimeoutExtensions.TimeoutAfter(stream.ReadAsync(array, offset, remaining), TimeoutMilliseconds);
+                readLength = await stream.ReadAsync(array, offset, remaining).WaitAsync(TimeSpan.FromMilliseconds(TimeoutMilliseconds));
                 if (readLength <= 0)
                 {
                     break;
@@ -229,10 +229,7 @@ namespace System.Net.Tests
         public async Task Read_LargeLengthAsynchronous_Success(bool transferEncodingChunked)
         {
             var rand = new Random(42);
-            byte[] expected = Enumerable
-                .Range(0, 128*1024 + 1) // More than 128kb
-                .Select(_ => (byte)('a' + rand.Next(0, 26)))
-                .ToArray();
+            byte[] expected = rand.GetItems("abcdefghijklmnopqrstuvwxyz"u8, 128 * 1024 + 1);
 
             Task<HttpListenerContext> contextTask = _listener.GetContextAsync();
 
@@ -269,10 +266,7 @@ namespace System.Net.Tests
         public async Task Read_LargeLengthSynchronous_Success(bool transferEncodingChunked)
         {
             var rand = new Random(42);
-            byte[] expected = Enumerable
-                .Range(0, 128 * 1024 + 1) // More than 128kb
-                .Select(_ => (byte)('a' + rand.Next(0, 26)))
-                .ToArray();
+            byte[] expected = rand.GetItems("abcdefghijklmnopqrstuvwxyz"u8, 128 * 1024 + 1);
 
             Task<HttpListenerContext> contextTask = _listener.GetContextAsync();
 
@@ -669,7 +663,7 @@ namespace System.Net.Tests
                 // If the content is missing, then the HttpListener needs
                 // to get the content. However, the socket has been closed
                 // before the reading of the content, so reading should fail.
-                client.Send(_factory.GetContent(RequestTypes.POST, Text, headerOnly: true));
+                await client.SendAsync(_factory.GetContent(RequestTypes.POST, Text, headerOnly: true));
                 HttpListenerContext context = await _listener.GetContextAsync();
 
                 // Disconnect the Socket from the HttpListener.
@@ -695,7 +689,7 @@ namespace System.Net.Tests
                 // If the content is missing, then the HttpListener needs
                 // to get the content. However, the socket has been closed
                 // before the reading of the content, so reading should fail.
-                client.Send(_factory.GetContent(RequestTypes.POST, Text, headerOnly: true));
+                await client.SendAsync(_factory.GetContent(RequestTypes.POST, Text, headerOnly: true));
                 HttpListenerContext context = await _listener.GetContextAsync();
 
                 // Disconnect the Socket from the HttpListener.

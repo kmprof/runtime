@@ -8,8 +8,8 @@ using Xunit;
 
 namespace System.Security.Cryptography.Encryption.TripleDes.Tests
 {
-    [SkipOnMono("Not supported on Browser", TestPlatforms.Browser)]
-    public static class TripleDESCipherTests
+    [SkipOnPlatform(TestPlatforms.Browser, "Not supported on Browser")]
+    public static partial class TripleDESCipherTests
     {
         [Fact]
         public static void TripleDESDefaults()
@@ -39,6 +39,35 @@ namespace System.Security.Cryptography.Encryption.TripleDes.Tests
             {
                 Assert.Throws<CryptographicException>(() => des.KeySize = 128 - des.BlockSize);
                 Assert.Throws<CryptographicException>(() => des.KeySize = 192 + des.BlockSize);
+            }
+        }
+
+        [Fact]
+        public static void SetKey_Sanity()
+        {
+            using (TripleDES one = TripleDESFactory.Create())
+            using (TripleDES two = TripleDESFactory.Create())
+            {
+                byte[] key = new byte[one.KeySize / 8];
+                RandomNumberGenerator.Fill(key);
+                one.SetKey(key);
+                two.Key = key;
+                two.IV = one.IV;
+
+                using (ICryptoTransform e1 = one.CreateEncryptor())
+                using (ICryptoTransform e2 = two.CreateEncryptor())
+                using (ICryptoTransform d1 = one.CreateDecryptor())
+                using (ICryptoTransform d2 = two.CreateDecryptor())
+                {
+                    byte[] c1 = e1.TransformFinalBlock(key, 0, key.Length);
+                    byte[] c2 = e2.TransformFinalBlock(key, 0, key.Length);
+                    Assert.Equal(c1, c2);
+
+                    byte[] p1 = d1.TransformFinalBlock(c1, 0, c1.Length);
+                    byte[] p2 = d2.TransformFinalBlock(c2, 0, c2.Length);
+                    Assert.Equal(p1, p2);
+                    Assert.Equal(key, p1);
+                }
             }
         }
 
@@ -108,7 +137,7 @@ namespace System.Security.Cryptography.Encryption.TripleDes.Tests
             );
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Fact]
         public static void VerifyKnownTransform_CFB64_PKCS7_2()
         {
             // NIST CAVS TDESMMT.ZIP TCFB8MMT2.rsp, [DECRYPT] COUNT=2
@@ -242,7 +271,7 @@ namespace System.Security.Cryptography.Encryption.TripleDes.Tests
             );
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Fact]
         public static void VerifyKnownTransform_CFB64_NoPadding_0()
         {
             // NIST CAVS TDESMMT.ZIP TCFB64MMT2.rsp, [DECRYPT] COUNT=0
@@ -257,7 +286,7 @@ namespace System.Security.Cryptography.Encryption.TripleDes.Tests
             );
         }
 
-        [ConditionalTheory(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Theory]
         [InlineData(CipherMode.CBC, 0)]
         [InlineData(CipherMode.CFB, 8)]
         [InlineData(CipherMode.CFB, 64)]
@@ -287,7 +316,7 @@ namespace System.Security.Cryptography.Encryption.TripleDes.Tests
             }
         }
 
-        [ConditionalTheory(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Theory]
         [InlineData(CipherMode.CBC, 0)]
         [InlineData(CipherMode.CFB, 8)]
         [InlineData(CipherMode.CFB, 64)]
@@ -322,7 +351,7 @@ namespace System.Security.Cryptography.Encryption.TripleDes.Tests
             }
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Fact]
         public static void VerifyKnownTransform_CFB64_NoPadding_1()
         {
             // NIST CAVS TDESMMT.ZIP TCFB64MMT2.rsp, [DECRYPT] COUNT=1
@@ -337,7 +366,7 @@ namespace System.Security.Cryptography.Encryption.TripleDes.Tests
             );
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Fact]
         public static void VerifyKnownTransform_CFB64_NoPadding_2()
         {
             // NIST CAVS TDESMMT.ZIP TCFB64MMT2.rsp, [DECRYPT] COUNT=2
@@ -352,7 +381,7 @@ namespace System.Security.Cryptography.Encryption.TripleDes.Tests
             );
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Fact]
         public static void VerifyKnownTransform_CFB64_NoPadding_3()
         {
             // NIST CAVS TDESMMT.ZIP TCFB64MMT2.rsp, [DECRYPT] COUNT=3
@@ -367,7 +396,7 @@ namespace System.Security.Cryptography.Encryption.TripleDes.Tests
             );
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Fact]
         public static void VerifyKnownTransform_CFB64_NoPadding_4()
         {
             // NIST CAVS TDESMMT.ZIP TCFB64MMT2.rsp, [DECRYPT] COUNT=4
@@ -382,7 +411,7 @@ namespace System.Security.Cryptography.Encryption.TripleDes.Tests
             );
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Fact]
         public static void VerifyKnownTransform_CFB64_NoPadding_5()
         {
             // NIST CAVS TDESMMT.ZIP TCFB64MMT2.rsp, [DECRYPT] COUNT=5
@@ -397,7 +426,7 @@ namespace System.Security.Cryptography.Encryption.TripleDes.Tests
             );
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Fact]
         public static void VerifyKnownTransform_CFB64_NoPadding_6()
         {
             // NIST CAVS TDESMMT.ZIP TCFB64MMT2.rsp, [DECRYPT] COUNT=6
@@ -412,7 +441,7 @@ namespace System.Security.Cryptography.Encryption.TripleDes.Tests
             );
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Fact]
         public static void VerifyKnownTransform_CFB64_NoPadding_7()
         {
             // NIST CAVS TDESMMT.ZIP TCFB64MMT2.rsp, [DECRYPT] COUNT=7
@@ -427,7 +456,7 @@ namespace System.Security.Cryptography.Encryption.TripleDes.Tests
             );
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Fact]
         public static void VerifyKnownTransform_CFB64_NoPadding_8()
         {
             // NIST CAVS TDESMMT.ZIP TCFB64MMT2.rsp, [DECRYPT] COUNT=8
@@ -442,7 +471,7 @@ namespace System.Security.Cryptography.Encryption.TripleDes.Tests
             );
         }
 
-        [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.IsNotWindows7))]
+        [Fact]
         public static void VerifyKnownTransform_CFB64_NoPadding_9()
         {
             // NIST CAVS TDESMMT.ZIP TCFB64MMT2.rsp, [DECRYPT] COUNT=9
@@ -460,7 +489,8 @@ namespace System.Security.Cryptography.Encryption.TripleDes.Tests
         private static byte[] TripleDESEncryptDirectKey(TripleDES tdes, byte[] key, byte[] iv, byte[] plainBytes)
         {
             using (MemoryStream output = new MemoryStream())
-            using (CryptoStream cryptoStream = new CryptoStream(output, tdes.CreateEncryptor(key, iv), CryptoStreamMode.Write))
+            using (ICryptoTransform encryptor = tdes.CreateEncryptor(key, iv))
+            using (CryptoStream cryptoStream = new CryptoStream(output, encryptor, CryptoStreamMode.Write))
             {
                 cryptoStream.Write(plainBytes, 0, plainBytes.Length);
                 cryptoStream.FlushFinalBlock();
@@ -472,7 +502,8 @@ namespace System.Security.Cryptography.Encryption.TripleDes.Tests
         private static byte[] TripleDESDecryptDirectKey(TripleDES tdes, byte[] key, byte[] iv, byte[] cipherBytes)
         {
             using (MemoryStream output = new MemoryStream())
-            using (CryptoStream cryptoStream = new CryptoStream(output, tdes.CreateDecryptor(key, iv), CryptoStreamMode.Write))
+            using (ICryptoTransform decryptor = tdes.CreateDecryptor(key, iv))
+            using (CryptoStream cryptoStream = new CryptoStream(output, decryptor, CryptoStreamMode.Write))
             {
                 cryptoStream.Write(cipherBytes, 0, cipherBytes.Length);
                 cryptoStream.FlushFinalBlock();
@@ -492,11 +523,14 @@ namespace System.Security.Cryptography.Encryption.TripleDes.Tests
         {
             byte[] liveEncryptBytes;
             byte[] liveDecryptBytes;
+            byte[] liveOneShotDecryptBytes = null;
+            byte[] liveOneShotEncryptBytes = null;
 
             using (TripleDES tdes = TripleDESFactory.Create())
             {
                 tdes.Mode = cipherMode;
                 tdes.Padding = paddingMode;
+                tdes.Key = key;
 
                 if (feedbackSize.HasValue)
                 {
@@ -505,6 +539,32 @@ namespace System.Security.Cryptography.Encryption.TripleDes.Tests
 
                 liveEncryptBytes = TripleDESEncryptDirectKey(tdes, key, iv, plainBytes);
                 liveDecryptBytes = TripleDESDecryptDirectKey(tdes, key, iv, cipherBytes);
+
+                if (cipherMode == CipherMode.ECB)
+                {
+                    liveOneShotDecryptBytes = tdes.DecryptEcb(cipherBytes, paddingMode);
+                    liveOneShotEncryptBytes = tdes.EncryptEcb(plainBytes, paddingMode);
+                }
+                else if (cipherMode == CipherMode.CBC)
+                {
+                    liveOneShotDecryptBytes = tdes.DecryptCbc(cipherBytes, iv, paddingMode);
+                    liveOneShotEncryptBytes = tdes.EncryptCbc(plainBytes, iv, paddingMode);
+                }
+                else if (cipherMode == CipherMode.CFB)
+                {
+                    liveOneShotDecryptBytes = tdes.DecryptCfb(cipherBytes, iv, paddingMode, feedbackSizeInBits: feedbackSize.Value);
+                    liveOneShotEncryptBytes = tdes.EncryptCfb(plainBytes, iv, paddingMode, feedbackSizeInBits: feedbackSize.Value);
+                }
+
+                if (liveOneShotDecryptBytes is not null)
+                {
+                    Assert.Equal(plainBytes, liveOneShotDecryptBytes);
+                }
+
+                if (liveOneShotEncryptBytes is not null)
+                {
+                    Assert.Equal(cipherBytes, liveOneShotEncryptBytes);
+                }
             }
 
             Assert.Equal(cipherBytes, liveEncryptBytes);

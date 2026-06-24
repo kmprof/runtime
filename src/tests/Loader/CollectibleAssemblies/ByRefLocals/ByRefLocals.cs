@@ -8,8 +8,10 @@ using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
+using Xunit;
+using TestLibrary;
 
-class Program
+public class Program
 {
     class TestALC : AssemblyLoadContext
     {
@@ -25,7 +27,10 @@ class Program
         }
     }
 
-    static int Main(string[] args)
+    [ActiveIssue("https://github.com/dotnet/runtimelab/issues/155: Collectible assemblies", typeof(Utilities), nameof(Utilities.IsNativeAot))]
+    [ActiveIssue("https://github.com/dotnet/runtime/issues/34072", TestRuntimes.Mono)]
+    [Fact]
+    public static int TestEntryPoint()
     {
         var holdResult = HoldAssembliesAliveThroughByRefFields(out GCHandle gch1, out GCHandle gch2);
         if (holdResult != 100)
@@ -90,7 +95,7 @@ class Program
     {
         var currentALC = AssemblyLoadContext.GetLoadContext(Assembly.GetExecutingAssembly());
         var alc = new TestALC(currentALC);
-        var a = alc.LoadFromAssemblyPath(Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "Unloaded.dll"));
+        var a = alc.LoadFromAssemblyPath(Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "ByRefLocalsUnloaded.dll"));
         gchToAssembly = GCHandle.Alloc(a, GCHandleType.WeakTrackResurrection);
 
         var spanAccessor = (IReturnSpan)Activator.CreateInstance(a.GetType("SpanAccessor"));

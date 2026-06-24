@@ -1,10 +1,14 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_26417;
+
 using System;
 using System.Runtime.CompilerServices;
+using Xunit;
 
-class GitHub_26417
+public class GitHub_26417
 {
     static int   _a;
 
@@ -30,7 +34,8 @@ class GitHub_26417
         }
     }
 
-    static int Main()
+    [Fact]
+    public static int TestEntryPoint()
     {
         int result = 100;
         try {

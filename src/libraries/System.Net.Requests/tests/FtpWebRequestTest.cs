@@ -40,9 +40,9 @@ namespace System.Net.Tests
             Assert.NotNull(request.Headers);
             Assert.Equal(0, request.Headers.Count);
             Assert.True(request.KeepAlive);
-            Assert.Equal(request.Method, WebRequestMethods.Ftp.DownloadFile);
+            Assert.Equal(WebRequestMethods.Ftp.DownloadFile, request.Method);
             Assert.Null(request.Proxy);
-            Assert.Equal(request.ReadWriteTimeout, 5 * 60 * 1000);
+            Assert.Equal(5 * 60 * 1000, request.ReadWriteTimeout);
             Assert.Null(request.RenameTo);
             Assert.Equal("ftp", request.RequestUri.Scheme);
             Assert.Equal("foo.com", request.RequestUri.Host);
@@ -79,10 +79,10 @@ namespace System.Net.Tests
 
         private const string absoluteUri = "ftp://localhost/";
 
-        private static readonly byte[] helloWorldBytes = Encoding.UTF8.GetBytes("Hello world");
+        private static readonly byte[] helloWorldBytes = "Hello world"u8.ToArray();
         private static readonly byte[] largeFileBytes = Enumerable.Range(0, 10 * 1024 * 1024).Select((i) => (byte)(i % 256)).ToArray();
 
-        [ConditionalTheory(nameof(LocalServerAvailable))]
+        [ConditionalTheory(typeof(FtpWebRequestTest), nameof(LocalServerAvailable))]
         [MemberData(nameof(Modes))]
         public void Ftp_CreateAndDelete(FtpExecutionMode mode)
         {
@@ -98,7 +98,7 @@ namespace System.Net.Tests
             Assert.False(FileExists(mode, uri));
         }
 
-        [ConditionalTheory(nameof(LocalServerAvailable))]
+        [ConditionalTheory(typeof(FtpWebRequestTest), nameof(LocalServerAvailable))]
         [MemberData(nameof(Modes))]
         public void Ftp_LargeFile(FtpExecutionMode mode)
         {
@@ -114,7 +114,7 @@ namespace System.Net.Tests
             Assert.False(FileExists(mode, uri));
         }
 
-        [ConditionalTheory(nameof(LocalServerAvailable))]
+        [ConditionalTheory(typeof(FtpWebRequestTest), nameof(LocalServerAvailable))]
         [MemberData(nameof(Modes))]
         public void Ftp_AppendFile(FtpExecutionMode mode)
         {
@@ -132,7 +132,7 @@ namespace System.Net.Tests
             Assert.False(FileExists(mode, uri));
         }
 
-        [ConditionalTheory(nameof(LocalServerAvailable))]
+        [ConditionalTheory(typeof(FtpWebRequestTest), nameof(LocalServerAvailable))]
         [MemberData(nameof(Modes))]
         public void Ftp_RenameFile(FtpExecutionMode mode)
         {
@@ -158,7 +158,7 @@ namespace System.Net.Tests
             Assert.False(FileExists(mode, newUri));
         }
 
-        [ConditionalTheory(nameof(LocalServerAvailable))]
+        [ConditionalTheory(typeof(FtpWebRequestTest), nameof(LocalServerAvailable))]
         [MemberData(nameof(Modes))]
         public void Ftp_MakeAndRemoveDir_Success(FtpExecutionMode mode)
         {
@@ -173,7 +173,7 @@ namespace System.Net.Tests
             Assert.False(DirExists(mode, dir));
         }
 
-        [ConditionalTheory(nameof(LocalServerAvailable))]
+        [ConditionalTheory(typeof(FtpWebRequestTest), nameof(LocalServerAvailable))]
         [MemberData(nameof(Modes))]
         public void Ftp_RenameFileSubDir_Success(FtpExecutionMode mode)
         {
@@ -201,6 +201,27 @@ namespace System.Net.Tests
 
             Assert.False(FileExists(mode, renamedFile));
             Assert.False(DirExists(mode, dir));
+        }
+
+        [Fact]
+        public void Ftp_Ignore_NewLine_Constructor_Throws_FormatException()
+        {
+            string uri = absoluteUri + Guid.NewGuid().ToString();
+
+            Assert.Throws<FormatException>(() => WebRequest.Create($"{uri}\r\n{WebRequestMethods.Ftp.AppendFile} {Guid.NewGuid().ToString()}"));
+        }
+
+        [ConditionalFact(typeof(FtpWebRequestTest), nameof(LocalServerAvailable))]
+        public void Ftp_Ignore_NewLine_GetRequestStream_And_GetResponse_Throws_FormatException_As_InnerException()
+        {
+            FtpWebRequest ftpWebRequest = (FtpWebRequest)WebRequest.Create(absoluteUri + Guid.NewGuid().ToString());
+            ftpWebRequest.Method = "APPE";
+            ftpWebRequest.Credentials = new NetworkCredential("test\r\ntest2", "test\r\ntest2");
+            var requestException = Assert.Throws<WebException>(() => ftpWebRequest.GetRequestStream());
+            Assert.True(requestException.InnerException is FormatException);
+
+            var responseException = Assert.Throws<WebException>(() => ftpWebRequest.GetResponse());
+            Assert.True(responseException.InnerException is FormatException);
         }
 
         private static async Task<MemoryStream> DoAsync(FtpWebRequest request, MemoryStream requestBody)

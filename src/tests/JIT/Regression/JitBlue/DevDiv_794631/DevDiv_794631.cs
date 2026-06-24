@@ -2,11 +2,17 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 //
 
-using System;
 
-class Repro
+namespace DevDiv_794631_ro;
+
+using System;
+using Xunit;
+
+public class Repro
 {
-    static int Main()
+    [OuterLoop]
+    [Fact]
+    public static int TestEntryPoint()
     {
         //This testcase ensures that we correctly generate one ReadUInt16() call
         //instead of two due to a bug in fgmorph which transformed a call result 

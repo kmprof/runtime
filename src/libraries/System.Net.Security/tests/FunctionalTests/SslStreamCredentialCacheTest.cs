@@ -28,26 +28,19 @@ namespace System.Net.Security.Tests
                 X509Certificate2Collection clientCertificateCollection =
                     new X509Certificate2Collection(certificate);
 
-                var tasks = new Task[2];
-
-                tasks[0] = server.AuthenticateAsServerAsync(certificate, true, false);
-                tasks[1] = client.AuthenticateAsClientAsync(
+                Task t1 = server.AuthenticateAsServerAsync(certificate, true, false);
+                Task t2 = client.AuthenticateAsClientAsync(
                                             certificate.GetNameInfo(X509NameType.SimpleName, false),
                                             clientCertificateCollection, false);
 
 
-                await Task.WhenAll(tasks).TimeoutAfter(TestConfiguration.PassingTestTimeoutMilliseconds);
+                await TestConfiguration.WhenAllOrAnyFailedWithTimeout(t1, t2);
 
-                if (!PlatformDetection.IsWindows7 ||
-                    Capability.IsTrustedRootCertificateInstalled())
+                if (Capability.IsTrustedRootCertificateInstalled())
                 {
                     // https://technet.microsoft.com/en-us/library/hh831771.aspx#BKMK_Changes2012R2
-                    // Starting with Windows 8, the "Management of trusted issuers for client authentication" has changed:
-                    // The behavior to send the Trusted Issuers List by default is off.
-                    //
-                    // In Windows 7 the Trusted Issuers List is sent within the Server Hello TLS record. This list is built
-                    // by the server using certificates from the Trusted Root Authorities certificate store.
-                    // The client side will use the Trusted Issuers List, if not empty, to filter proposed certificates.
+                    // On Windows, the "Management of trusted issuers for client authentication" is configured
+                    // such that the behavior to send the Trusted Issuers List by default is off.
 
                     Assert.True(client.IsMutuallyAuthenticated);
                     Assert.True(server.IsMutuallyAuthenticated);

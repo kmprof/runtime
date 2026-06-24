@@ -1,9 +1,13 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-using System.Runtime.CompilerServices;
 
-class C
+namespace DevDiv_283795;
+
+using System.Runtime.CompilerServices;
+using Xunit;
+
+public class C
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static int[] M()
@@ -22,7 +26,8 @@ class C
         return true;
     }
 
-    static int Main()
+    [Fact]
+    public static int TestEntryPoint()
     {
         // The original repro of the bug associated with this test involved an assert after re-morphing a tree modified
         // by CSE: the original tree contained both a CSE def and a CSE use, and re-morphing eliminated the use, causing

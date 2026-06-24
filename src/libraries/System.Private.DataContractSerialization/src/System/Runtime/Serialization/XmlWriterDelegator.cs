@@ -1,8 +1,9 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-using System.Xml;
 using System.Globalization;
+using System.Runtime.Serialization.DataContracts;
+using System.Xml;
 
 
 namespace System.Runtime.Serialization
@@ -16,7 +17,8 @@ namespace System.Runtime.Serialization
 
         public XmlWriterDelegator(XmlWriter writer)
         {
-            XmlObjectSerializer.CheckNull(writer, nameof(writer));
+            ArgumentNullException.ThrowIfNull(writer);
+
             this.writer = writer;
             this.dictionaryWriter = writer as XmlDictionaryWriter;
         }
@@ -84,7 +86,7 @@ namespace System.Runtime.Serialization
                         string? prefix = writer.LookupPrefix(ns);
                         if (prefix == null)
                         {
-                            prefix = string.Format(CultureInfo.InvariantCulture, "d{0}p{1}", depth, _prefixes);
+                            prefix = string.Create(CultureInfo.InvariantCulture, $"d{depth}p{_prefixes}");
                             _prefixes++;
                             writer.WriteAttributeString("xmlns", prefix, null, ns);
                         }
@@ -116,8 +118,8 @@ namespace System.Runtime.Serialization
                 dictionaryWriter.WriteStartAttribute(prefix, localName, namespaceUri);
             else
                 writer.WriteStartAttribute(prefix,
-                    (localName == null ? null : localName.Value)!,
-                    (namespaceUri == null ? null : namespaceUri.Value));
+                    localName?.Value!,
+                    namespaceUri?.Value);
         }
 
         internal void WriteAttributeString(string? prefix, string localName, string? ns, string value)
@@ -229,7 +231,7 @@ namespace System.Runtime.Serialization
             if (dictionaryWriter != null)
                 dictionaryWriter.WriteStartElement(prefix, localName, namespaceUri);
             else
-                writer.WriteStartElement(prefix, (localName == null ? null : localName.Value)!, (namespaceUri == null ? null : namespaceUri.Value));
+                writer.WriteStartElement(prefix, localName?.Value!, namespaceUri?.Value);
             depth++;
             _prefixes = 1;
         }
@@ -239,7 +241,7 @@ namespace System.Runtime.Serialization
             if (dictionaryWriter != null)
                 dictionaryWriter.WriteStartElement(null, localName, namespaceUri);
             else
-                writer.WriteStartElement(null, (localName == null ? null : localName.Value)!, (namespaceUri == null ? null : namespaceUri.Value));
+                writer.WriteStartElement(null, localName?.Value!, namespaceUri?.Value);
         }
 
         internal void WriteEndElementPrimitive()
@@ -267,7 +269,7 @@ namespace System.Runtime.Serialization
             WriteXmlnsAttribute(ns);
         }
 
-        private Exception CreateInvalidPrimitiveTypeException(Type type)
+        private static InvalidDataContractException CreateInvalidPrimitiveTypeException(Type type)
         {
             return new InvalidDataContractException(SR.Format(SR.InvalidPrimitiveType_Serialization, DataContract.GetClrTypeFullName(type)));
         }
@@ -280,7 +282,7 @@ namespace System.Runtime.Serialization
         internal void WriteAnyType(object value, Type valueType)
         {
             bool handled = true;
-            switch (valueType.GetTypeCode())
+            switch (Type.GetTypeCode(valueType))
             {
                 case TypeCode.Boolean:
                     WriteBoolean((bool)value);
@@ -328,6 +330,7 @@ namespace System.Runtime.Serialization
                     WriteUnsignedLong((ulong)value);
                     break;
                 case TypeCode.Empty:
+                case TypeCode.DBNull:
                 case TypeCode.Object:
                 default:
                     if (valueType == Globals.TypeOfByteArray)
@@ -344,12 +347,16 @@ namespace System.Runtime.Serialization
                         WriteUri((Uri)value);
                     else if (valueType == Globals.TypeOfXmlQualifiedName)
                         WriteQName((XmlQualifiedName)value);
+                    else if (valueType == Globals.TypeOfDateOnly)
+                        WriteDateOnly((DateOnly)value);
+                    else if (valueType == Globals.TypeOfTimeOnly)
+                        WriteTimeOnly((TimeOnly)value);
                     else
                         handled = false;
                     break;
             }
             if (!handled)
-                throw System.Runtime.Serialization.DiagnosticUtility.ExceptionUtility.ThrowHelperError(CreateInvalidPrimitiveTypeException(valueType));
+                throw CreateInvalidPrimitiveTypeException(valueType);
         }
 
         internal void WriteExtensionData(IDataNode dataNode)
@@ -423,6 +430,10 @@ namespace System.Runtime.Serialization
                         WriteUri(((DataNode<Uri>)dataNode).GetValue());
                     else if (valueType == Globals.TypeOfXmlQualifiedName)
                         WriteQName(((DataNode<XmlQualifiedName>)dataNode).GetValue());
+                    else if (valueType == Globals.TypeOfDateOnly)
+                        WriteDateOnly(((DataNode<DateOnly>)dataNode).GetValue());
+                    else if (valueType == Globals.TypeOfTimeOnly)
+                        WriteTimeOnly(((DataNode<TimeOnly>)dataNode).GetValue());
                     else
                         handled = false;
                     break;
@@ -430,7 +441,7 @@ namespace System.Runtime.Serialization
 
             if (!handled)
             {
-                throw System.Runtime.Serialization.DiagnosticUtility.ExceptionUtility.ThrowHelperError(CreateInvalidPrimitiveTypeException(valueType));
+                throw CreateInvalidPrimitiveTypeException(valueType);
             }
         }
 
@@ -452,13 +463,37 @@ namespace System.Runtime.Serialization
 
         internal virtual void WriteDateTime(DateTime value)
         {
-            WriteString(XmlConvert.ToString(value, XmlDateTimeSerializationMode.RoundtripKind));
+            writer.WriteValue(value);
         }
 
         internal void WriteDateTime(DateTime value, XmlDictionaryString name, XmlDictionaryString? ns)
         {
             WriteStartElementPrimitive(name, ns);
             WriteDateTime(value);
+            WriteEndElementPrimitive();
+        }
+
+        // DateOnly / TimeOnly
+        internal virtual void WriteDateOnly(DateOnly value)
+        {
+            writer.WriteString(value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+        }
+        internal void WriteDateOnly(DateOnly value, XmlDictionaryString name, XmlDictionaryString? ns)
+        {
+            WriteStartElementPrimitive(name, ns);
+            WriteDateOnly(value);
+            WriteEndElementPrimitive();
+        }
+        internal virtual void WriteTimeOnly(TimeOnly value)
+        {
+            // Use optional fractional second digits (F) so trailing zeros and the '.' are omitted automatically.
+            // "f" forces zeros; "F" suppresses them. "HH:mm:ss.FFFFFFF" yields minimal length representation.
+            writer.WriteString(value.ToString("HH:mm:ss.FFFFFFF", CultureInfo.InvariantCulture));
+        }
+        internal void WriteTimeOnly(TimeOnly value, XmlDictionaryString name, XmlDictionaryString? ns)
+        {
+            WriteStartElementPrimitive(name, ns);
+            WriteTimeOnly(value);
             WriteEndElementPrimitive();
         }
 
@@ -615,13 +650,6 @@ namespace System.Runtime.Serialization
         internal void WriteTimeSpan(TimeSpan value)
         {
             writer.WriteRaw(XmlConvert.ToString(value));
-        }
-
-        internal void WriteTimeSpan(char value, XmlDictionaryString name, XmlDictionaryString? ns)
-        {
-            WriteStartElementPrimitive(name, ns);
-            writer.WriteRaw(XmlConvert.ToString(value));
-            WriteEndElementPrimitive();
         }
 
         internal void WriteTimeSpan(TimeSpan value, XmlDictionaryString name, XmlDictionaryString? ns)

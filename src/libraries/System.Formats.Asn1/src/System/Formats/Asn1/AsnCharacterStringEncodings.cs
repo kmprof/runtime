@@ -1,24 +1,21 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-using System.Collections.Generic;
+using System.Buffers.Binary;
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using System.Text;
 
 namespace System.Formats.Asn1
 {
     internal static class AsnCharacterStringEncodings
     {
-        private static readonly Encoding s_utf8Encoding =
-            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
-
-        private static readonly Encoding s_bmpEncoding = new BMPEncoding();
-        private static readonly Encoding s_ia5Encoding = new IA5Encoding();
-        private static readonly Encoding s_visibleStringEncoding = new VisibleStringEncoding();
-        private static readonly Encoding s_numericStringEncoding = new NumericStringEncoding();
-        private static readonly Encoding s_printableStringEncoding = new PrintableStringEncoding();
-        private static readonly Encoding s_t61Encoding = new T61Encoding();
+        private static readonly UTF8Encoding s_utf8Encoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+        private static readonly BMPEncoding s_bmpEncoding = new BMPEncoding();
+        private static readonly IA5Encoding s_ia5Encoding = new IA5Encoding();
+        private static readonly VisibleStringEncoding s_visibleStringEncoding = new VisibleStringEncoding();
+        private static readonly NumericStringEncoding s_numericStringEncoding = new NumericStringEncoding();
+        private static readonly PrintableStringEncoding s_printableStringEncoding = new PrintableStringEncoding();
+        private static readonly T61Encoding s_t61Encoding = new T61Encoding();
 
         internal static Encoding GetEncoding(UniversalTagNumber encodingType) =>
             encodingType switch
@@ -32,47 +29,6 @@ namespace System.Formats.Asn1
                 UniversalTagNumber.T61String => s_t61Encoding,
                 _ => throw new ArgumentOutOfRangeException(nameof(encodingType), encodingType, null),
             };
-
-        internal static int GetByteCount(this Encoding encoding, ReadOnlySpan<char> str)
-        {
-            if (str.IsEmpty)
-            {
-                // Ensure a non-null pointer is obtained, even though the expected answer is 0.
-                str = string.Empty.AsSpan();
-            }
-
-            unsafe
-            {
-                fixed (char* strPtr = &MemoryMarshal.GetReference(str))
-                {
-                    return encoding.GetByteCount(strPtr, str.Length);
-                }
-            }
-        }
-
-        internal static int GetBytes(this Encoding encoding, ReadOnlySpan<char> chars, Span<byte> bytes)
-        {
-            if (chars.IsEmpty)
-            {
-                // Ensure a non-null pointer is obtained.
-                chars = string.Empty.AsSpan();
-            }
-
-            if (bytes.IsEmpty)
-            {
-                // Ensure a non-null pointer is obtained.
-                bytes = Array.Empty<byte>();
-            }
-
-            unsafe
-            {
-                fixed (char* charsPtr = &MemoryMarshal.GetReference(chars))
-                fixed (byte* bytesPtr = &MemoryMarshal.GetReference(bytes))
-                {
-                    return encoding.GetBytes(charsPtr, chars.Length, bytesPtr, bytes.Length);
-                }
-            }
-        }
     }
 
     internal abstract class SpanBasedEncoding : Encoding
@@ -101,7 +57,7 @@ namespace System.Formats.Asn1
         }
 
         public
-#if NETCOREAPP || NETSTANDARD2_1
+#if NET || NETSTANDARD2_1
             override
 #endif
         int GetByteCount(ReadOnlySpan<char> chars)
@@ -136,7 +92,7 @@ namespace System.Formats.Asn1
         }
 
         public
-#if NETCOREAPP || NETSTANDARD2_1
+#if NET || NETSTANDARD2_1
             override
 #endif
         int GetCharCount(ReadOnlySpan<byte> bytes)
@@ -177,7 +133,7 @@ namespace System.Formats.Asn1
         }
     }
 
-    internal sealed  class VisibleStringEncoding : RestrictedAsciiStringEncoding
+    internal sealed class VisibleStringEncoding : RestrictedAsciiStringEncoding
     {
         // T-REC-X.680-201508 sec 41, Table 8.
         // ISO International Register of Coded Character Sets to be used with Escape Sequences 006
@@ -219,15 +175,12 @@ namespace System.Formats.Asn1
 
             bool[] isAllowed = new bool[0x80];
 
-            for (byte charCode = minCharAllowed; charCode <= maxCharAllowed; charCode++)
-            {
-                isAllowed[charCode] = true;
-            }
+            isAllowed.AsSpan(minCharAllowed, maxCharAllowed - minCharAllowed + 1).Fill(true);
 
             _isAllowed = isAllowed;
         }
 
-        protected RestrictedAsciiStringEncoding(IEnumerable<char> allowedChars)
+        protected RestrictedAsciiStringEncoding(string allowedChars)
         {
             bool[] isAllowed = new bool[0x7F];
 
@@ -238,7 +191,7 @@ namespace System.Formats.Asn1
                     throw new ArgumentOutOfRangeException(nameof(allowedChars));
                 }
 
-                Debug.Assert(isAllowed[c] == false);
+                Debug.Assert(!isAllowed[c]);
                 isAllowed[c] = true;
             }
 
@@ -378,8 +331,7 @@ namespace System.Formats.Asn1
 
             for (int i = 0; i < bytes.Length; i += 2)
             {
-                int val = bytes[i] << 8 | bytes[i + 1];
-                char c = (char)val;
+                char c = (char)BinaryPrimitives.ReadInt16BigEndian(bytes.Slice(i));
 
                 if (char.IsSurrogate(c))
                 {
@@ -422,7 +374,7 @@ namespace System.Formats.Asn1
     /// </summary>
     internal sealed class T61Encoding : Encoding
     {
-        private static readonly Encoding s_utf8Encoding = new UTF8Encoding(false, throwOnInvalidBytes: true);
+        private static readonly UTF8Encoding s_utf8Encoding = new UTF8Encoding(false, throwOnInvalidBytes: true);
         private static readonly Encoding s_latin1Encoding = GetEncoding("iso-8859-1");
 
         public override int GetByteCount(char[] chars, int index, int count)
@@ -440,7 +392,7 @@ namespace System.Formats.Asn1
             return s_utf8Encoding.GetByteCount(s);
         }
 
-#if NETCOREAPP || NETSTANDARD2_1
+#if NET || NETSTANDARD2_1
         public override int GetByteCount(ReadOnlySpan<char> chars)
         {
             return s_utf8Encoding.GetByteCount(chars);
@@ -481,7 +433,7 @@ namespace System.Formats.Asn1
             }
         }
 
-#if NETCOREAPP || NETSTANDARD2_1
+#if NET || NETSTANDARD2_1
         public override int GetCharCount(ReadOnlySpan<byte> bytes)
         {
             try

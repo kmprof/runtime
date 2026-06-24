@@ -7,6 +7,7 @@ using System.Formats.Asn1;
 using System.IO;
 using System.Security.Cryptography;
 using System.Security.Cryptography.Asn1;
+using System.Security.Cryptography.Asn1.Pkcs7;
 using System.Security.Cryptography.Pkcs;
 using System.Security.Cryptography.Pkcs.Asn1;
 using System.Security.Cryptography.X509Certificates;
@@ -78,7 +79,7 @@ namespace Internal.Cryptography.Pal.AnyOS
 
             if (unprotectedAttributes != null && unprotectedAttributes.Count > 0)
             {
-                List<AttributeAsn> attrList = CmsSigner.BuildAttributes(unprotectedAttributes);
+                List<AttributeAsn> attrList = PkcsHelpers.BuildAttributes(unprotectedAttributes);
 
                 envelopedData.UnprotectedAttributes = PkcsHelpers.NormalizeAttributeSet(attrList.ToArray());
             }
@@ -146,14 +147,13 @@ namespace Internal.Cryptography.Pal.AnyOS
             return PkcsHelpers.EncodeContentInfo(writer.Encode(), Oids.Pkcs7Enveloped);
         }
 
-        private byte[] EncryptContent(
+        private static byte[] EncryptContent(
             ContentInfo contentInfo,
             AlgorithmIdentifier contentEncryptionAlgorithm,
             out byte[] cek,
             out byte[] parameterBytes)
         {
             using (SymmetricAlgorithm alg = OpenAlgorithm(contentEncryptionAlgorithm))
-            using (ICryptoTransform encryptor = alg.CreateEncryptor())
             {
                 cek = alg.Key;
 
@@ -172,17 +172,12 @@ namespace Internal.Cryptography.Pal.AnyOS
 
                 byte[] toEncrypt = contentInfo.Content;
 
-                if (contentInfo.ContentType.Value == Oids.Pkcs7Data)
+                if (contentInfo.ContentType.Value == Oids.Pkcs7Data || contentInfo.Content.Length == 0)
                 {
-                    return encryptor.OneShot(toEncrypt);
+                    return EncryptOneShot(alg, contentInfo.Content);
                 }
                 else
                 {
-                    if (contentInfo.Content.Length == 0)
-                    {
-                        return encryptor.OneShot(contentInfo.Content);
-                    }
-
                     try
                     {
                         AsnDecoder.ReadEncodedValue(
@@ -192,16 +187,26 @@ namespace Internal.Cryptography.Pal.AnyOS
                             out int contentLength,
                             out _);
 
-                        ReadOnlySpan<byte> content =
-                            contentInfo.Content.AsSpan(contentOffset, contentLength);
-
-                        return encryptor.OneShot(content.ToArray());
+                        ReadOnlySpan<byte> content = contentInfo.Content.AsSpan(contentOffset, contentLength);
+                        return EncryptOneShot(alg, content);
                     }
                     catch (AsnContentException e)
                     {
                         throw new CryptographicException(SR.Cryptography_Der_Invalid_Encoding, e);
                     }
                 }
+            }
+
+            static byte[] EncryptOneShot(SymmetricAlgorithm alg, ReadOnlySpan<byte> plaintext)
+            {
+#if NET
+                return alg.EncryptCbc(plaintext, alg.IV);
+#else
+                using (ICryptoTransform encryptor = alg.CreateEncryptor())
+                {
+                    return encryptor.OneShot(plaintext.ToArray());
+                }
+#endif
             }
         }
     }

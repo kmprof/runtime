@@ -9,6 +9,7 @@ using Xunit;
 
 namespace System.Net.Http.Functional.Tests
 {
+    [SkipOnPlatform(TestPlatforms.Browser | TestPlatforms.Wasi, "ConnectCallback is not supported on Browser and Wasi")]
     public sealed class Http1CloseResponseStreamConformanceTests : ResponseConnectedStreamConformanceTests
     {
         protected override string GetResponseHeaders() => "HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n";
@@ -20,8 +21,10 @@ namespace System.Net.Http.Functional.Tests
             Assert.True(pair.Stream2.CanRead);
             return pair;
         }
+
     }
 
+    [SkipOnPlatform(TestPlatforms.Browser | TestPlatforms.Wasi, "ConnectCallback is not supported on Browser and Wasi")]
     public sealed class Http1RawResponseStreamConformanceTests : ResponseConnectedStreamConformanceTests
     {
         protected override string GetResponseHeaders() => "HTTP/1.1 101 Switching Protocols\r\n\r\n";
@@ -33,8 +36,10 @@ namespace System.Net.Http.Functional.Tests
             Assert.True(pair.Stream2.CanRead);
             return pair;
         }
+
     }
 
+    [SkipOnPlatform(TestPlatforms.Browser | TestPlatforms.Wasi, "ConnectCallback is not supported on Browser and Wasi")]
     public sealed class Http1ContentLengthResponseStreamConformanceTests : ResponseStandaloneStreamConformanceTests
     {
         protected override async Task WriteResponseAsync(Stream responseStream, byte[] bodyData)
@@ -44,6 +49,7 @@ namespace System.Net.Http.Functional.Tests
         }
     }
 
+    [SkipOnPlatform(TestPlatforms.Browser | TestPlatforms.Wasi, "ConnectCallback is not supported on Browser and Wasi")]
     public sealed class Http1SingleChunkResponseStreamConformanceTests : ResponseStandaloneStreamConformanceTests
     {
         protected override async Task WriteResponseAsync(Stream responseStream, byte[] bodyData)
@@ -54,12 +60,13 @@ namespace System.Net.Http.Functional.Tests
                 // One chunk for the whole response body
                 await responseStream.WriteAsync(Encoding.ASCII.GetBytes($"{bodyData.Length:X}\r\n"));
                 await responseStream.WriteAsync(bodyData);
-                await responseStream.WriteAsync(Encoding.ASCII.GetBytes("\r\n"));
+                await responseStream.WriteAsync("\r\n"u8.ToArray());
             }
-            await responseStream.WriteAsync(Encoding.ASCII.GetBytes("0\r\n\r\n"));
+            await responseStream.WriteAsync("0\r\n\r\n"u8.ToArray());
         }
     }
 
+    [SkipOnPlatform(TestPlatforms.Browser | TestPlatforms.Wasi, "ConnectCallback is not supported on Browser and Wasi")]
     public sealed class Http1MultiChunkResponseStreamConformanceTests : ResponseStandaloneStreamConformanceTests
     {
         protected override async Task WriteResponseAsync(Stream responseStream, byte[] bodyData)
@@ -70,9 +77,9 @@ namespace System.Net.Http.Functional.Tests
                 // One chunk per byte of the response body
                 await responseStream.WriteAsync(Encoding.ASCII.GetBytes($"1\r\n"));
                 await responseStream.WriteAsync(bodyData.AsMemory(i, 1));
-                await responseStream.WriteAsync(Encoding.ASCII.GetBytes("\r\n"));
+                await responseStream.WriteAsync("\r\n"u8.ToArray());
             }
-            await responseStream.WriteAsync(Encoding.ASCII.GetBytes("0\r\n\r\n"));
+            await responseStream.WriteAsync("0\r\n\r\n"u8.ToArray());
         }
     }
 
@@ -80,6 +87,7 @@ namespace System.Net.Http.Functional.Tests
     {
         protected override Type UnsupportedConcurrentExceptionType => null;
         protected override bool UsableAfterCanceledReads => false;
+        protected override bool BlocksOnZeroByteReads => true;
 
         protected abstract string GetResponseHeaders();
 

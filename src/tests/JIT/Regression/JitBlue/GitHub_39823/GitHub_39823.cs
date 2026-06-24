@@ -1,11 +1,15 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+
+namespace GitHub_39823;
+
 using System;
 using System.Runtime.CompilerServices;
 using System.Diagnostics;
+using Xunit;
 
-class Runtime_39823
+public class Runtime_39823
 {
     struct IntsWrapped
     {
@@ -23,12 +27,14 @@ class Runtime_39823
     }
 
 
-    public static unsafe int Main()
+    [OuterLoop]
+    [Fact]
+    public static unsafe int TestEntryPoint()
     {
         try
         {
             TestUnusedObjCopy((IntsWrapped*)0);
-            Debug.Assert(false, "unreachable");
+            Debug.Fail("unreachable");
         }
         catch
         {

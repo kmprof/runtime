@@ -3,6 +3,7 @@
 
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.IO;
 
 namespace System.Text.Json
 {
@@ -24,8 +25,8 @@ namespace System.Text.Json
         ///   </para>
         ///
         ///   <para>
-        ///     Upon completion of this method <paramref name="reader"/> will be positioned at the
-        ///     final token in the JSON value.  If an exception is thrown the reader is reset to
+        ///     Upon completion of this method, <paramref name="reader"/> will be positioned at the
+        ///     final token in the JSON value. If an exception is thrown, the reader is reset to
         ///     the state it was in when the method was called.
         ///   </para>
         ///
@@ -52,6 +53,71 @@ namespace System.Text.Json
             return document.RootElement;
         }
 
+        internal static JsonElement ParseValue(ref Utf8JsonReader reader, bool allowDuplicateProperties)
+        {
+            bool ret = JsonDocument.TryParseValue(
+                ref reader,
+                out JsonDocument? document,
+                shouldThrow: true,
+                useArrayPools: false,
+                allowDuplicateProperties: allowDuplicateProperties);
+
+            Debug.Assert(ret, "TryParseValue returned false with shouldThrow: true.");
+            Debug.Assert(document != null, "null document returned with shouldThrow: true.");
+            return document.RootElement;
+        }
+
+        internal static JsonElement ParseValue(Stream utf8Json, JsonDocumentOptions options)
+        {
+            JsonDocument document = JsonDocument.ParseValue(utf8Json, options);
+            return document.RootElement;
+        }
+
+        /// <summary>
+        /// Parses UTF8-encoded text representing a single JSON value into a <see cref="JsonElement"/>.
+        /// </summary>
+        /// <param name="utf8Json">The JSON text to parse.</param>
+        /// <param name="options">Options to control the reader behavior during parsing.</param>
+        /// <returns>A <see cref="JsonElement"/> representation of the JSON value.</returns>
+        /// <exception cref="JsonException"><paramref name="utf8Json"/> does not represent a valid single JSON value.</exception>
+        /// <exception cref="ArgumentException"><paramref name="options"/> contains unsupported options.</exception>
+        public static JsonElement Parse([StringSyntax(StringSyntaxAttribute.Json)] ReadOnlySpan<byte> utf8Json, JsonDocumentOptions options = default)
+        {
+            JsonDocument document = JsonDocument.ParseValue(utf8Json, options);
+            return document.RootElement;
+        }
+
+        /// <summary>
+        /// Parses text representing a single JSON value into a <see cref="JsonElement"/>.
+        /// </summary>
+        /// <param name="json">The JSON text to parse.</param>
+        /// <param name="options">Options to control the reader behavior during parsing.</param>
+        /// <returns>A <see cref="JsonElement"/> representation of the JSON value.</returns>
+        /// <exception cref="JsonException"><paramref name="json"/> does not represent a valid single JSON value.</exception>
+        /// <exception cref="ArgumentException"><paramref name="options"/> contains unsupported options.</exception>
+        public static JsonElement Parse([StringSyntax(StringSyntaxAttribute.Json)] ReadOnlySpan<char> json, JsonDocumentOptions options = default)
+        {
+            JsonDocument document = JsonDocument.ParseValue(json, options);
+            return document.RootElement;
+        }
+
+        /// <summary>
+        /// Parses text representing a single JSON value into a <see cref="JsonElement"/>.
+        /// </summary>
+        /// <param name="json">The JSON text to parse.</param>
+        /// <param name="options">Options to control the reader behavior during parsing.</param>
+        /// <returns>A <see cref="JsonElement"/> representation of the JSON value.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="json"/> is <see langword="null"/>.</exception>
+        /// <exception cref="JsonException"><paramref name="json"/> does not represent a valid single JSON value.</exception>
+        /// <exception cref="ArgumentException"><paramref name="options"/> contains unsupported options.</exception>
+        public static JsonElement Parse([StringSyntax(StringSyntaxAttribute.Json)] string json, JsonDocumentOptions options = default)
+        {
+            ArgumentNullException.ThrowIfNull(json);
+
+            JsonDocument document = JsonDocument.ParseValue(json, options);
+            return document.RootElement;
+        }
+
         /// <summary>
         ///   Attempts to parse one JSON value (including objects or arrays) from the provided reader.
         /// </summary>
@@ -71,7 +137,7 @@ namespace System.Text.Json
         ///   </para>
         ///
         ///   <para>
-        ///     Upon completion of this method <paramref name="reader"/> will be positioned at the
+        ///     Upon completion of this method, <paramref name="reader"/> will be positioned at the
         ///     final token in the JSON value.  If an exception is thrown, or <see langword="false"/>
         ///     is returned, the reader is reset to the state it was in when the method was called.
         ///   </para>

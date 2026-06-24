@@ -10,7 +10,7 @@ using Xunit.Abstractions;
 
 namespace System.Net.Sockets.Tests
 {
-    [Collection(nameof(NoParallelTests))]
+    [Collection(nameof(DisableParallelization))]
     public abstract class SendReceiveNonParallel<T> : SocketTestHelperBase<T> where T : SocketHelperBase, new()
     {
         public SendReceiveNonParallel(ITestOutputHelper output) : base(output) { }
@@ -39,6 +39,10 @@ namespace System.Net.Sockets.Tests
 
             using var left = useClone ? new Socket(origLeft.SafeHandle) : origLeft;
             using var right = useClone ? new Socket(origRight.SafeHandle) : origRight;
+
+            // Force non-blocking mode in ...SyncForceNonBlocking variants of the test: 
+            ConfigureNonBlocking(left);
+            ConfigureNonBlocking(right);
 
             var leftEndpoint = (IPEndPoint)left.LocalEndPoint;
             var rightEndpoint = (IPEndPoint)right.LocalEndPoint;
@@ -100,16 +104,19 @@ namespace System.Net.Sockets.Tests
         }
     }
 
+    [ConditionalClass(typeof(PlatformDetection), nameof(PlatformDetection.IsMultithreadingSupported))]
     public sealed class SendReceiveNonParallel_Sync : SendReceiveNonParallel<SocketHelperArraySync>
     {
         public SendReceiveNonParallel_Sync(ITestOutputHelper output) : base(output) { }
     }
 
+    [ConditionalClass(typeof(PlatformDetection), nameof(PlatformDetection.IsMultithreadingSupported))]
     public sealed class SendReceiveNonParallel_SyncForceNonBlocking : SendReceiveNonParallel<SocketHelperSyncForceNonBlocking>
     {
         public SendReceiveNonParallel_SyncForceNonBlocking(ITestOutputHelper output) : base(output) { }
     }
 
+    [ConditionalClass(typeof(PlatformDetection), nameof(PlatformDetection.IsMultithreadingSupported))]
     public sealed class SendReceiveNonParallel_Apm : SendReceiveNonParallel<SocketHelperApm>
     {
         public SendReceiveNonParallel_Apm(ITestOutputHelper output) : base(output) { }
@@ -120,16 +127,23 @@ namespace System.Net.Sockets.Tests
         public SendReceiveNonParallel_Task(ITestOutputHelper output) : base(output) { }
     }
 
+    public sealed class SendReceiveNonParallel_CancellableTask : SendReceiveNonParallel<SocketHelperCancellableTask>
+    {
+        public SendReceiveNonParallel_CancellableTask(ITestOutputHelper output) : base(output) { }
+    }
+
     public sealed class SendReceiveNonParallel_Eap : SendReceiveNonParallel<SocketHelperEap>
     {
         public SendReceiveNonParallel_Eap(ITestOutputHelper output) : base(output) { }
     }
 
+    [ConditionalClass(typeof(PlatformDetection), nameof(PlatformDetection.IsMultithreadingSupported))]
     public sealed class SendReceiveNonParallel_SpanSync : SendReceiveNonParallel<SocketHelperSpanSync>
     {
         public SendReceiveNonParallel_SpanSync(ITestOutputHelper output) : base(output) { }
     }
 
+    [ConditionalClass(typeof(PlatformDetection), nameof(PlatformDetection.IsMultithreadingSupported))]
     public sealed class SendReceiveNonParallel_SpanSyncForceNonBlocking : SendReceiveNonParallel<SocketHelperSpanSyncForceNonBlocking>
     {
         public SendReceiveNonParallel_SpanSyncForceNonBlocking(ITestOutputHelper output) : base(output) { }

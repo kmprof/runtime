@@ -1,6 +1,6 @@
 Fixes Issue <!-- Issue Number -->
 
-Master PR <!-- Link to PR if any that fixed this in the master branch. -->
+main PR <!-- Link to PR if any that fixed this in the main branch. -->
 
 # Description
 
@@ -21,3 +21,8 @@ Master PR <!-- Link to PR if any that fixed this in the master branch. -->
 # Risk
 
 <!-- Please assess the risk of taking this fix. Provide details backing up your assessment. -->
+
+# Package authoring no longer needed in .NET 9
+
+IMPORTANT: Starting with .NET 9, you no longer need to edit a NuGet package's csproj to enable building and bump the version.
+Keep in mind that we still need package authoring in .NET 8 and older versions.

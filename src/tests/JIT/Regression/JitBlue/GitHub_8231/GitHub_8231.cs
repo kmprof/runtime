@@ -4,8 +4,9 @@
 using System;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using Xunit;
 
-namespace N
+namespace GitHub_8231
 {
     public static class C
     {
@@ -34,7 +35,9 @@ namespace N
             return s;
         }
 
-        public static int Main(string[] args)
+        [OuterLoop]
+        [Fact]
+        public static int TestEntryPoint()
         {
             int result = Test();
 
